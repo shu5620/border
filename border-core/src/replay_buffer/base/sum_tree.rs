@@ -2,7 +2,8 @@
 //!
 //! Code is adapted from <https://github.com/jaromiru/AI-blog/blob/master/SumTree.py> and
 /// <https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py>
-use rand::{rngs::StdRng, RngCore};
+
+// use rand::{rngs::StdRng, RngCore};
 use segment_tree::{
     ops::{MaxIgnoreNaN, MinIgnoreNaN},
     SegmentPoint,
@@ -28,7 +29,7 @@ pub struct SumTree {
     min_tree: SegmentPoint<f32, MinIgnoreNaN>,
     max_tree: SegmentPoint<f32, MaxIgnoreNaN>,
     normalize: WeightNormalizer,
-    rng: fastrand::Rng,
+    _rng: fastrand::Rng,
 }
 
 impl SumTree {
@@ -42,7 +43,7 @@ impl SumTree {
             min_tree: SegmentPoint::build(vec![f32::MAX; capacity], MinIgnoreNaN),
             max_tree: SegmentPoint::build(vec![1e-8f32; capacity], MaxIgnoreNaN),
             normalize,
-            rng: fastrand::Rng::with_seed(0),
+            _rng: fastrand::Rng::with_seed(0),
         }
     }
 
