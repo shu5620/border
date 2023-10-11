@@ -8,6 +8,7 @@ pub use iw_scheduler::IwScheduler;
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sum_tree::SumTree;
 pub use sum_tree::WeightNormalizer;
+use std::time::SystemTime;
 
 struct PerState {
     sum_tree: SumTree,
@@ -107,16 +108,36 @@ where
 
     fn push(&mut self, tr: Self::PushedItem) -> Result<()> {
         let len = tr.len(); // batch size
+        
+        let time = SystemTime::now();
         let (obs, act, next_obs, reward, is_done, _, _) = tr.unpack();
-        self.obs.push(self.i, obs);
-        self.act.push(self.i, act);
-        self.next_obs.push(self.i, next_obs);
-        self.push_reward(self.i, &reward);
-        self.push_is_done(self.i, &is_done);
+        println!("time unpack: {}", time.elapsed().unwrap().as_secs_f32());
 
+        let time = SystemTime::now();
+        self.obs.push(self.i, obs);
+        println!("time push obs: {}", time.elapsed().unwrap().as_secs_f32());
+
+        let time = SystemTime::now();
+        self.act.push(self.i, act);
+        println!("time push act: {}", time.elapsed().unwrap().as_secs_f32());
+
+        let time = SystemTime::now();
+        self.next_obs.push(self.i, next_obs);
+        println!("time push next_obs: {}", time.elapsed().unwrap().as_secs_f32());
+
+        let time = SystemTime::now();
+        self.push_reward(self.i, &reward);
+        println!("time push reword: {}", time.elapsed().unwrap().as_secs_f32());
+
+        let time = SystemTime::now();
+        self.push_is_done(self.i, &is_done);
+        println!("time push is_done: {}", time.elapsed().unwrap().as_secs_f32());
+
+        let time = SystemTime::now();
         if self.per_state.is_some() {
             self.set_priority(len)
         };
+        println!("time push set_priority: {}", time.elapsed().unwrap().as_secs_f32());
 
         self.i = (self.i + len) % self.capacity;
         self.size += len;
