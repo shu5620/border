@@ -16,3 +16,6 @@ pub use shape::Shape;
 
 mod trainer;
 pub use trainer::{SyncSampler, Trainer, TrainerConfig};
+
+mod named_tensors;
+pub use named_tensors::NamedTensors;

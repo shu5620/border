@@ -25,6 +25,7 @@ aquamarine = "0.1"
 fastrand = "1.4.0"
 segment-tree = "2.0.0"
 rand = "0.8.4"
+tch = "0.5.0"
 
 [dev-dependencies]
 tempdir = "0.3.7"
