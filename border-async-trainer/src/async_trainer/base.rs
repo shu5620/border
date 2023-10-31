@@ -146,7 +146,7 @@ where
         }
     }
 
-    fn evaluate(&mut self, agent: &mut A, env: &mut E) -> Result<f32> {
+    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
         agent.eval();
 
         let mut r_total = 0f32;
@@ -157,7 +157,8 @@ where
 
             loop {
                 let act = agent.sample(&prev_obs);
-                let (step, _) = env.step(&act);
+                let (step, record_) = env.step(&act);
+                record.extend(record_);
                 r_total += step.reward[0];
                 if step.is_done[0] == 1 {
                     break;
@@ -174,7 +175,7 @@ where
     /// Do evaluation.
     #[inline(always)]
     fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
-        let eval_reward = self.evaluate(agent, env).unwrap();
+        let eval_reward = self.evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
         // Save the best model up to the current iteration

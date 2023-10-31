@@ -106,6 +106,11 @@ impl Record {
         Record(self.0.into_iter().chain(record.0).collect())
     }
 
+    /// Extend record
+    pub fn extend(&mut self, record: Record) {
+        self.0.extend(record.0);
+    }
+
     /// Get scalar value.
     ///
     /// * `key` - The key of an entry in the record.

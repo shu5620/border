@@ -173,7 +173,7 @@ where
     }
 
     /// Run episodes with the given agent and returns the average of cumulative reward.
-    fn evaluate<A>(&mut self, agent: &mut A) -> Result<f32>
+    fn evaluate<A>(&mut self, agent: &mut A, record: &mut Record) -> Result<f32>
     where
         A: Agent<E, R>,
     {
@@ -194,7 +194,8 @@ where
 
             loop {
                 let act = agent.sample(&prev_obs);
-                let (step, _) = env.step(&act);
+                let (step, record_) = env.step(&act);
+                record.extend(record_);
                 r_total += step.reward[0];
                 if step.is_done[0] == 1 {
                     break;
@@ -265,7 +266,7 @@ where
 
                 // Do evaluation
                 if do_eval {
-                    let eval_reward = self.evaluate(agent)?;
+                    let eval_reward = self.evaluate(agent, &mut record)?;
                     record.insert("eval_reward", Scalar(eval_reward));
 
                     // Save the best model up to the current iteration
