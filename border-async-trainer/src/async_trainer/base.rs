@@ -148,6 +148,7 @@ where
 
     fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
         agent.eval();
+        env.set_eval_mode();
 
         let mut r_total = 0f32;
 
@@ -168,6 +169,7 @@ where
         }
 
         agent.train();
+        env.set_train_mode();
 
         Ok(r_total / self.eval_episodes as f32)
     }
@@ -272,7 +274,9 @@ where
         let mut env = {
             let mut tmp = guard_init_env.lock().unwrap();
             *tmp = true;
-            E::build(&self.env_config, 0).unwrap()
+            let mut env = E::build(&self.env_config, 0).unwrap();
+            env.set_train_mode();
+            env
         };
         let mut agent = A::build(self.agent_config.clone());
         let mut buffer = R::build(&self.replay_buffer_config);

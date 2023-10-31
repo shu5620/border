@@ -119,7 +119,11 @@ where
             ReplayBufferProxy::<R>::build_with_sender(self.id, &self.replay_buffer_config, sender);
         let mut sampler = {
             let mut tmp = guard.lock().unwrap();
-            let env = E::build(&self.env_config, self.env_seed).unwrap();
+            let env = {
+                let mut env = E::build(&self.env_config, self.env_seed).unwrap();
+                env.set_train_mode();
+                env
+            };
             let step_proc = P::build(&self.step_proc_config);
             *tmp = true;
             SyncSampler::new(env, step_proc)

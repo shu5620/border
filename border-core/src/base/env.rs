@@ -47,4 +47,10 @@ pub trait Env {
     ///
     /// [`Trainer`]: crate::Trainer
     fn reset_with_index(&mut self, ix: usize) -> Result<Self::Obs>;
+
+    /// Set to train mode
+    fn set_train_mode(&mut self);
+
+    /// Set to evaluate mode
+    fn set_eval_mode(&mut self);
 }

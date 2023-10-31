@@ -186,6 +186,7 @@ where
         };
 
         let mut env = E::build(env_config, 0)?; // TODO use eval_env_config
+        env.set_eval_mode();
         let mut r_total = 0f32;
 
         for ix in 0..self.eval_episodes {
@@ -205,6 +206,7 @@ where
         }
 
         agent.train();
+        env.set_train_mode();
 
         Ok(r_total / self.eval_episodes as f32)
     }
@@ -240,7 +242,11 @@ where
         A: Agent<E, R>,
         S: Recorder,
     {
-        let env = E::build(&self.env_config_train, 0)?;
+        let env = {
+            let mut env = E::build(&self.env_config_train, 0)?;
+            env.set_train_mode();
+            env
+        };
         let producer = P::build(&self.step_proc_config);
         let mut buffer = R::build(&self.replay_buffer_config);
         let mut sampler = SyncSampler::new(env, producer);
