@@ -18,19 +18,20 @@ impl Default for SimpleStepProcessorConfig {
 ///
 /// It supports 1-step TD backup for non-vectorized environment:
 /// `E::Obs.len()` must be 1.
-pub struct SimpleStepProcessor<E, O, A> {
+pub struct SimpleStepProcessor<E, O, A, R> {
     prev_obs: Option<O>,
-    phantom: PhantomData<(E, A)>
+    phantom: PhantomData<(E, A, R)>
 }
 
-impl<E, O, A> StepProcessorBase<E> for SimpleStepProcessor<E, O, A>
+impl<E, O, A, R> StepProcessorBase<E> for SimpleStepProcessor<E, O, A, R>
 where
     E: Env,
     O: SubBatch + From<E::Obs>,
     A: SubBatch + From<E::Act>,
+    R: SubBatch + From<E::Reward>,
 {
     type Config = SimpleStepProcessorConfig;
-    type Output = StdBatch<O, A>;
+    type Output = StdBatch<O, A, R>;
 
     fn build(_config: &Self::Config) -> Self {
         Self {
@@ -52,7 +53,7 @@ where
             let next_obs = step.obs.clone().into();
             let obs = self.prev_obs.replace(step.obs.into()).unwrap();
             let act = step.act.into();
-            let reward = step.reward;
+            let reward = step.reward.into();
             let is_done = step.is_done;
             let ix_sample = None;
             let weight = None;

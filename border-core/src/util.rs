@@ -2,7 +2,7 @@
 //! Utilities for interaction of agents and environments.
 use crate::{
     record::{RecordValue, Recorder},
-    Env, Policy
+    Env, Policy, Reward,
 };
 use anyhow::Result;
 
@@ -115,10 +115,10 @@ where
         loop {
             let act = policy.sample(&prev_obs);
             let (step, mut record) = env.step(&act);
-            r_total += step.reward[0];
+            r_total += step.reward.reward();
             prev_obs = step.obs;
 
-            record.insert("reward", RecordValue::Scalar(step.reward[0] as _));
+            record.insert("reward", RecordValue::Scalar(step.reward.reward() as _));
             record.insert("episode", RecordValue::Scalar(episode as _));
             record.insert("step", RecordValue::Scalar(count_step as _));
             recorder.write(record);
@@ -167,10 +167,10 @@ where
     for t in 0..n_steps {
         let act = policy.sample(&prev_obs);
         let (step, mut record) = env.step(&act);
-        r_total += step.reward[0];
+        r_total += step.reward.reward();
         prev_obs = step.obs;
 
-        record.insert("reward", RecordValue::Scalar(step.reward[0] as _));
+        record.insert("reward", RecordValue::Scalar(step.reward.reward() as _));
         record.insert("step", RecordValue::Scalar(t as _));
         recorder.write(record);
 

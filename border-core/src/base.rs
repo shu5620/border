@@ -39,3 +39,12 @@ pub trait Act: Clone + Debug {
     /// Returns the number of actions in the object.
     fn len(&self) -> usize;
 }
+
+/// A set of rewards of the environment.
+pub trait Reward: Clone + Debug {
+    /// Returns reward value
+    fn reward(&self) -> f32;
+    
+    /// Returns the number of rewards in the object.
+    fn len(&self) -> usize;
+}

@@ -3,10 +3,11 @@ use super::SubBatch;
 use crate::StdBatchBase;
 
 /// A generic implementation of [`StdBatchBase`](`crate::StdBatchBase`).
-pub struct StdBatch<O, A>
+pub struct StdBatch<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
     /// Observations.
     pub obs: O,
@@ -18,7 +19,7 @@ where
     pub next_obs: O,
 
     /// Rewards.
-    pub reward: Vec<f32>,
+    pub reward: R,
 
     /// Done flags.
     pub is_done: Vec<i8>,
@@ -30,13 +31,15 @@ where
     pub ix_sample: Option<Vec<usize>>,
 }
 
-impl<O, A> StdBatchBase for StdBatch<O, A>
+impl<O, A, R> StdBatchBase for StdBatch<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
     type ObsBatch = O;
     type ActBatch = A;
+    type RewardBatch = R;
 
     fn unpack(
         self,
@@ -44,7 +47,7 @@ where
         Self::ObsBatch,
         Self::ActBatch,
         Self::ObsBatch,
-        Vec<f32>,
+        Self::RewardBatch,
         Vec<i8>,
         Option<Vec<usize>>,
         Option<Vec<f32>>,
@@ -61,7 +64,7 @@ where
     }
 
     fn len(&self) -> usize {
-        self.reward.len()
+        self.is_done.len()
     }
 
     fn obs(&self) -> &Self::ObsBatch {
@@ -76,7 +79,7 @@ where
         &self.next_obs
     }
 
-    fn reward(&self) -> &Vec<f32> {
+    fn reward(&self) -> &Self::RewardBatch {
         &self.reward
     }
 
@@ -97,7 +100,7 @@ where
             obs: O::new(0),
             act: A::new(0),
             next_obs: O::new(0),
-            reward: vec![],
+            reward: R::new(0),
             is_done: vec![],
             ix_sample: None,
             weight: None,
@@ -105,10 +108,11 @@ where
     }
 }
 
-impl<O, A> StdBatch<O, A>
+impl<O, A, R> StdBatch<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
     /// Creates new batch with the given capacity.
     pub fn with_capacity(capacity: usize) -> Self {
@@ -116,7 +120,7 @@ where
             obs: O::new(capacity),
             act: A::new(capacity),
             next_obs: O::new(capacity),
-            reward: vec![0.0; capacity],
+            reward: R::new(0),
             is_done: vec![0; capacity],
             ix_sample: None,
             weight: None,
