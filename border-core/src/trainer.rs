@@ -3,7 +3,7 @@ mod config;
 mod sampler;
 use crate::{
     record::{Record, Recorder},
-    Agent, Env, Obs, ReplayBufferBase, StepProcessorBase,
+    Agent, Env, Obs, ReplayBufferBase, StepProcessorBase, base::Reward,
 };
 use anyhow::Result;
 pub use config::TrainerConfig;
@@ -197,7 +197,7 @@ where
                 let act = agent.sample(&prev_obs);
                 let (step, record_) = env.step(&act);
                 record.extend(record_);
-                r_total += step.reward[0];
+                r_total += step.reward.reward_for_save_model();
                 if step.is_done[0] == 1 {
                     break;
                 }

@@ -2,7 +2,7 @@ use crate::{AsyncTrainerConfig, PushedItemMessage, SyncModel, AsyncTrainStat};
 use anyhow::Result;
 use border_core::{
     record::{Record, RecordValue::Scalar, Recorder},
-    Agent, Env, Obs, ReplayBufferBase,
+    Agent, Env, Obs, ReplayBufferBase, Reward,
 };
 use crossbeam_channel::{Receiver, Sender};
 use log::info;
@@ -160,7 +160,7 @@ where
                 let act = agent.sample(&prev_obs);
                 let (step, record_) = env.step(&act);
                 record.extend(record_);
-                r_total += step.reward[0];
+                r_total += step.reward.reward_for_save_model();
                 if step.is_done[0] == 1 {
                     break;
                 }

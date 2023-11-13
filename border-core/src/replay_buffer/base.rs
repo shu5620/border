@@ -28,10 +28,11 @@ impl PerState {
 }
 
 /// A simple generic replay buffer.
-pub struct SimpleReplayBuffer<O, A>
+pub struct SimpleReplayBuffer<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
     capacity: usize,
     i: usize,
@@ -39,29 +40,18 @@ where
     obs: O,
     act: A,
     next_obs: O,
-    reward: Vec<f32>,
+    reward: R,
     is_done: Vec<i8>,
     rng: StdRng,
     per_state: Option<PerState>,
 }
 
-impl<O, A> SimpleReplayBuffer<O, A>
+impl<O, A, R> SimpleReplayBuffer<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
-    #[inline]
-    fn push_reward(&mut self, i: usize, b: &Vec<f32>) {
-        let mut j = i;
-        for r in b.iter() {
-            self.reward[j] = *r;
-            j += 1;
-            if j == self.capacity {
-                j = 0;
-            }
-        }
-    }
-
     #[inline]
     fn push_is_done(&mut self, i: usize, b: &Vec<i8>) {
         let mut j = i;
@@ -72,10 +62,6 @@ where
                 j = 0;
             }
         }
-    }
-
-    fn sample_reward(&self, ixs: &Vec<usize>) -> Vec<f32> {
-        ixs.iter().map(|ix| self.reward[*ix]).collect()
     }
 
     fn sample_is_done(&self, ixs: &Vec<usize>) -> Vec<i8> {
@@ -94,12 +80,13 @@ where
     }
 }
 
-impl<O, A> ExperienceBufferBase for SimpleReplayBuffer<O, A>
+impl<O, A, R> ExperienceBufferBase for SimpleReplayBuffer<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
-    type PushedItem = StdBatch<O, A>;
+    type PushedItem = StdBatch<O, A, R>;
 
     fn len(&self) -> usize {
         self.size
@@ -111,7 +98,7 @@ where
         self.obs.push(self.i, obs);
         self.act.push(self.i, act);
         self.next_obs.push(self.i, next_obs);
-        self.push_reward(self.i, &reward);
+        self.reward.push(self.i, reward);
         self.push_is_done(self.i, &is_done);
 
         if self.per_state.is_some() {
@@ -129,13 +116,14 @@ where
 }
 
 
-impl<O, A> ReplayBufferBase for SimpleReplayBuffer<O, A>
+impl<O, A, R> ReplayBufferBase for SimpleReplayBuffer<O, A, R>
 where
     O: SubBatch,
     A: SubBatch,
+    R: SubBatch,
 {
     type Config = SimpleReplayBufferConfig;
-    type Batch = StdBatch<O, A>;
+    type Batch = StdBatch<O, A, R>;
 
     fn build(config: &Self::Config) -> Self {
         let capacity = config.capacity;
@@ -151,7 +139,7 @@ where
             obs: O::new(capacity),
             act: A::new(capacity),
             next_obs: O::new(capacity),
-            reward: vec![0.; capacity],
+            reward: R::new(capacity),
             is_done: vec![0; capacity],
             // rng: Rng::with_seed(config.seed),
             rng: StdRng::seed_from_u64(config.seed as _),
@@ -179,7 +167,7 @@ where
             obs: self.obs.sample(&ixs),
             act: self.act.sample(&ixs),
             next_obs: self.next_obs.sample(&ixs),
-            reward: self.sample_reward(&ixs),
+            reward: self.reward.sample(&ixs),
             is_done: self.sample_is_done(&ixs),
             ix_sample: Some(ixs),
             weight,

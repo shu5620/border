@@ -1,5 +1,5 @@
 //! Environment.
-use super::{Act, Info, Obs, Step};
+use super::{Act, Info, Obs, Reward, Step};
 use crate::record::Record;
 use anyhow::Result;
 
@@ -13,6 +13,9 @@ pub trait Env {
 
     /// Action of the environment.
     type Act: Act;
+
+    /// Reward of the environment.
+    type Reward: Reward;
 
     /// Information in the [self::Step] object.
     type Info: Info;

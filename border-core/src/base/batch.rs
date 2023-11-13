@@ -14,8 +14,11 @@ pub trait StdBatchBase {
     /// A set of observation in a batch.
     type ObsBatch;
 
-    /// A set of observation in a batch.
+    /// A set of action in a batch.
     type ActBatch;
+
+    /// A set of reward in a batch.
+    type RewardBatch;
 
     /// Unpack the data `(o_t, a_t, o_t+n, r_t, is_done_t)`.
     ///
@@ -27,7 +30,7 @@ pub trait StdBatchBase {
         Self::ObsBatch,
         Self::ActBatch,
         Self::ObsBatch,
-        Vec<f32>,
+        Self::RewardBatch,
         Vec<i8>,
         Option<Vec<usize>>,
         Option<Vec<f32>>,
@@ -46,7 +49,7 @@ pub trait StdBatchBase {
     fn next_obs(&self) -> &Self::ObsBatch;
 
     /// Returns `r_t`.
-    fn reward(&self) -> &Vec<f32>;
+    fn reward(&self) -> &Self::RewardBatch;
 
     /// Returns `is_done_t`.
     fn is_done(&self) -> &Vec<i8>;
