@@ -3,6 +3,7 @@ use tch::{nn::VarStore, Device::Cpu, Tensor};
 
 /// Named tensors to send model parameters using a channel.
 pub struct NamedTensors {
+    #[allow(missing_docs)]
     pub named_tensors: HashMap<String, Tensor>,
 }
 
