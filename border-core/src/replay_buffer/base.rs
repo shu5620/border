@@ -44,6 +44,7 @@ where
     is_done: Vec<i8>,
     rng: StdRng,
     per_state: Option<PerState>,
+    latest_indexes: Vec<usize>
 }
 
 impl<O, A, R> SimpleReplayBuffer<O, A, R>
@@ -105,6 +106,11 @@ where
             self.set_priority(len)
         };
 
+        for i in 0..len {
+            let ix = (self.i + i) % self.capacity;
+            self.latest_indexes.push(ix);
+        }
+
         self.i = (self.i + len) % self.capacity;
         self.size += len;
         if self.size >= self.capacity {
@@ -144,6 +150,7 @@ where
             // rng: Rng::with_seed(config.seed),
             rng: StdRng::seed_from_u64(config.seed as _),
             per_state,
+            latest_indexes: vec![],
         }
     }
 
@@ -172,6 +179,22 @@ where
             ix_sample: Some(ixs),
             weight,
         })
+    }
+
+    fn batch_latest(&mut self) -> anyhow::Result<Self::Batch> {
+
+        let ixs = self.latest_indexes.clone();
+        let batch = Ok(Self::Batch {
+            obs: self.obs.sample(&ixs),
+            act: self.act.sample(&ixs),
+            next_obs: self.next_obs.sample(&ixs),
+            reward: self.reward.sample(&ixs),
+            is_done: self.sample_is_done(&ixs),
+            ix_sample: Some(ixs),
+            weight: None,
+        });
+        self.latest_indexes = Vec::new();
+        batch
     }
 
     fn update_priority(&mut self, ixs: &Option<Vec<usize>>, td_errs: &Option<Vec<f32>>) {

@@ -89,6 +89,10 @@ impl<R: ReplayBufferBase> ReplayBufferBase for ReplayBufferProxy<R> {
         unimplemented!();
     }
 
+    fn batch_latest(&mut self) -> anyhow::Result<Self::Batch> {
+        unimplemented!();
+    }
+
     fn update_priority(&mut self, _ixs: &Option<Vec<usize>>, _td_err: &Option<Vec<f32>>) {
         unimplemented!();
     }

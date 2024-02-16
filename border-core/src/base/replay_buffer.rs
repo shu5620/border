@@ -36,6 +36,9 @@ pub trait ReplayBufferBase: ExperienceBufferBase {
     /// `beta` - The exponent for priority.
     fn batch(&mut self, size: usize) -> Result<Self::Batch>;
 
+    /// tmp
+    fn batch_latest(&mut self) -> Result<Self::Batch>;
+
     /// Updates priority.
     ///
     /// Priority is commonly based on TD error.
