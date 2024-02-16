@@ -26,4 +26,8 @@ pub trait Agent<E: Env, R: ReplayBufferBase>: Policy<E> {
 
     /// Load the agent from the given directory.
     fn load<T: AsRef<Path>>(&mut self, path: T) -> Result<()>;
+
+    /// observe new samples
+    #[allow(unused_variables)]
+    fn observe_new_samples(&mut self, samples: &Vec<R::PushedItem>) {}
 }

@@ -300,13 +300,20 @@ where
         loop {
             // Update replay buffer
             let msgs: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
-            msgs.into_iter().for_each(|msg| {
-                samples += msg.pushed_items.len();
-                samples_total += msg.pushed_items.len();
-                msg.pushed_items
-                    .into_iter()
-                    .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
-            });
+            let pushed_items = msgs
+                .into_iter()
+                .map(|msg| msg.pushed_items)
+                .flatten()
+                .collect::<Vec<_>>();
+
+            samples += pushed_items.len();
+            samples_total += pushed_items.len();
+
+            agent.observe_new_samples(&pushed_items);
+
+            for item in pushed_items {
+                buffer.push(item).unwrap();
+            }
 
             let record = agent.opt(&mut buffer);
 
