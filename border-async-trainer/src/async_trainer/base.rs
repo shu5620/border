@@ -168,6 +168,7 @@ where
             }
         }
 
+        agent.set_reward(r_total / self.eval_episodes as f32);
         agent.train();
         env.set_train_mode();
 

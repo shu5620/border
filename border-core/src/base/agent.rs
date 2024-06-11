@@ -26,4 +26,7 @@ pub trait Agent<E: Env, R: ReplayBufferBase>: Policy<E> {
 
     /// Load the agent from the given directory.
     fn load<T: AsRef<Path>>(&mut self, path: T) -> Result<()>;
+
+    /// set reward after evaluation
+    fn set_reward(&mut self, reward: f32);
 }
