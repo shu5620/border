@@ -83,7 +83,7 @@ where
 
     fn sync_model_first(agent: &mut A, model_info: &Arc<Mutex<(usize, A::ModelInfo)>>, id: usize) {
         let model_info = model_info.lock().unwrap();
-        agent.sync_model(&model_info.1);
+        agent.sync_model(id, &model_info.1);
         info!("Received the initial model info in actor {}", id);
     }
 
@@ -96,7 +96,7 @@ where
         let model_info = model_info.lock().unwrap();
         if model_info.0 > *n_opt_steps {
             *n_opt_steps = model_info.0;
-            agent.sync_model(&model_info.1);
+            agent.sync_model(id, &model_info.1);
             info!(
                 "Synchronized the model info of {} opt steps in actor {}",
                 n_opt_steps, id
