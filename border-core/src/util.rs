@@ -104,7 +104,7 @@ where
     P: Policy<E>,
     R: Recorder,
 {
-    env.set_train_mode();
+    env.set_eval_mode();
     let mut rs = Vec::new();
 
     for episode in 0..n_episodes {
@@ -158,7 +158,7 @@ where
     P: Policy<E>,
     R: Recorder,
 {
-    env.set_train_mode();
+    env.set_eval_mode();
     let mut r_total = 0.0;
     let mut prev_obs = if prev_obs.is_some() {
         prev_obs.unwrap()
