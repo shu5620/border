@@ -5,7 +5,7 @@ use tch::{IndexOp, Tensor};
 fn main() {
     let tau = Tensor::of_slice(
         (1..10)
-            .map(|x| 0.1 * x as f32)
+            .map(|x| 0.1 * x as f64)
             .collect::<Vec<_>>()
             .as_slice(),
     );
@@ -14,7 +14,7 @@ fn main() {
             .map(|_| {
                 Tensor::of_slice(
                     (0..40)
-                        .map(|x| (x as f32 - 20.) / 10.)
+                        .map(|x| (x as f64 - 20.) / 10.)
                         .collect::<Vec<_>>()
                         .as_slice(),
                 )
@@ -29,7 +29,7 @@ fn main() {
     (0..data.size()[0])
         .map(|i| data.i(i))
         .map(|t| {
-            Vec::<f32>::from(&t)
+            Vec::<f64>::from(&t)
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()

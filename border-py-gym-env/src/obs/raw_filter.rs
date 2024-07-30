@@ -46,7 +46,7 @@ impl<S, T1, T2, U> PyGymEnvObsFilter<U> for PyGymEnvObsRawFilter<S, T1, T2, U>
 where
     S: Shape,
     T1: Element + Debug + num_traits::identities::Zero + AsPrimitive<T2>,
-    T2: 'static + Copy + Debug + num_traits::Zero + AsPrimitive<f32>,
+    T2: 'static + Copy + Debug + num_traits::Zero + AsPrimitive<f64>,
     U: Obs + From<PyGymEnvObs<S, T1, T2>>,
 {
     type Config = PyGymEnvObsRawFilterConfig;
@@ -132,7 +132,7 @@ where
             // let array1: Vec<T2> = obs.obs.iter().cloned().collect();
             // let record = Record::from_slice(&[("obs", RecordValue::Array1(array1))]);
             let record = {
-                // let vec = Vec::<f32>::from_iter(obs.obs.iter().map(|x| x.as_()));
+                // let vec = Vec::<f64>::from_iter(obs.obs.iter().map(|x| x.as_()));
                 let vec = obs.obs.iter().map(|x| x.as_()).collect();
                 Record::from_slice(&[("obs", RecordValue::Array1(vec))])
             };

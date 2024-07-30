@@ -40,10 +40,10 @@ const MODEL_DIR: &str = "./border/examples/model/dqn_cartpole";
 shape!(ObsShape, [DIM_OBS as usize]);
 shape!(ActShape, [1]);
 
-type PyObsDtype = f32;
+type PyObsDtype = f64;
 
 #[derive(Clone, Debug)]
-struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f32>);
+struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f64>);
 
 impl border_core::Obs for Obs {
     fn dummy(n: usize) -> Self {
@@ -59,8 +59,8 @@ impl border_core::Obs for Obs {
     }
 }
 
-impl From<PyGymEnvObs<ObsShape, PyObsDtype, f32>> for Obs {
-    fn from(obs: PyGymEnvObs<ObsShape, PyObsDtype, f32>) -> Self {
+impl From<PyGymEnvObs<ObsShape, PyObsDtype, f64>> for Obs {
+    fn from(obs: PyGymEnvObs<ObsShape, PyObsDtype, f64>) -> Self {
         Obs(obs)
     }
 }
@@ -71,7 +71,7 @@ impl From<Obs> for Tensor {
     }
 }
 
-struct ObsBatch(TensorSubBatch<ObsShape, f32>);
+struct ObsBatch(TensorSubBatch<ObsShape, f64>);
 
 impl SubBatch for ObsBatch {
     fn new(capacity: usize) -> Self {
@@ -158,7 +158,7 @@ impl From<ActBatch> for Tensor {
 }
 
 impl From<Tensor> for Act {
-    // `t` must be a 1-dimentional tensor of `f32` (?)
+    // `t` must be a 1-dimentional tensor of `f64` (?)
     fn from(t: Tensor) -> Self {
         let data: Vec<i64> = t.into();
         let data: Vec<_> = data.iter().map(|e| *e as i32).collect();
@@ -166,7 +166,7 @@ impl From<Tensor> for Act {
     }
 }
 
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f64, Obs>;
 type ActFilter = PyGymEnvDiscreteActRawFilter<Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 type StepProc = SimpleStepProcessor<Env, ObsBatch, ActBatch>;
@@ -176,7 +176,7 @@ type ReplayBuffer = SimpleReplayBuffer<ObsBatch, ActBatch>;
 struct CartpoleRecord {
     episode: usize,
     step: usize,
-    reward: f32,
+    reward: f64,
     obs: Vec<f64>,
 }
 

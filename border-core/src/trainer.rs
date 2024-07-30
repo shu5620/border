@@ -43,7 +43,7 @@ pub use sampler::SyncSampler;
 ///         * If the evaluation result is the best, agent's model parameters are saved
 ///           in directory `(model_dir)/best`.
 ///     4. If `opt_steps % record_interval == 0`, compute OSPS as
-///        `opt_steps_ops / timer.elapsed()?.as_secs_f32()` and add it to the
+///        `opt_steps_ops / timer.elapsed()?.as_secs_f64()` and add it to the
 ///        recorder as `"opt_steps_per_sec"`.
 ///     5. If `opt_steps % save_interval == 0`, agent's model parameters are saved
 ///        in directory `(model_dir)/(opt_steps)`.
@@ -173,7 +173,7 @@ where
     }
 
     /// Run episodes with the given agent and returns the average of cumulative reward.
-    fn evaluate<A>(&mut self, agent: &mut A, record: &mut Record) -> Result<f32>
+    fn evaluate<A>(&mut self, agent: &mut A, record: &mut Record) -> Result<f64>
     where
         A: Agent<E, R>,
     {
@@ -187,7 +187,7 @@ where
 
         let mut env = E::build(env_config, 0)?; // TODO use eval_env_config
         env.set_eval_mode();
-        let mut r_total = 0f32;
+        let mut r_total = 0f64;
 
         for ix in 0..self.eval_episodes {
             let mut prev_obs = env.reset_with_index(ix)?;
@@ -208,7 +208,7 @@ where
         agent.train();
         env.set_train_mode();
 
-        Ok(r_total / self.eval_episodes as f32)
+        Ok(r_total / self.eval_episodes as f64)
     }
 
     /// Performs a training step.
@@ -250,7 +250,7 @@ where
         let producer = P::build(&self.step_proc_config);
         let mut buffer = R::build(&self.replay_buffer_config);
         let mut sampler = SyncSampler::new(env, producer);
-        let mut max_eval_reward = f32::MIN;
+        let mut max_eval_reward = f64::MIN;
         let mut env_steps: usize = 0;
         let mut opt_steps: usize = 0;
         let mut opt_steps_ops: usize = 0; // optimizations per second
@@ -285,11 +285,11 @@ where
 
                 // Record
                 if do_rec {
-                    record.insert("env_steps", Scalar(env_steps as f32));
+                    record.insert("env_steps", Scalar(env_steps as f64));
                     record.insert("fps", Scalar(sampler.fps()));
                     sampler.reset();
-                    let time = timer.elapsed()?.as_secs_f32();
-                    let osps = opt_steps_ops as f32 / time;
+                    let time = timer.elapsed()?.as_secs_f64();
+                    let osps = opt_steps_ops as f64 / time;
                     record.insert("opt_steps_per_sec", Scalar(osps));
                     opt_steps_ops = 0;
                     timer = std::time::SystemTime::now();

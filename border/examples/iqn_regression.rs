@@ -145,7 +145,7 @@ fn main() {
     (0..data.size()[0])
         .map(|i| data.i(i))
         .map(|t| {
-            Vec::<f32>::from(&t)
+            Vec::<f64>::from(&t)
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()
@@ -154,7 +154,7 @@ fn main() {
 
     // Write prediction to file
     let xs = (Tensor::range(0, 99, FLOAT_CPU) / 100.0 * 10.0 - 5.0).unsqueeze(-1);
-    let tau = Tensor::of_slice(&[0.1f32, 0.3, 0.5, 0.7, 0.9])
+    let tau = Tensor::of_slice(&[0.1f64, 0.3, 0.5, 0.7, 0.9])
         .unsqueeze(0)
         .repeat(&[100, 1]);
     let ys = model.forward(&xs, &tau).squeeze_dim(-1);
@@ -164,7 +164,7 @@ fn main() {
     (0..data.size()[0])
         .map(|i| data.i(i))
         .map(|t| {
-            Vec::<f32>::from(&t)
+            Vec::<f64>::from(&t)
                 .iter()
                 .map(|x| x.to_string())
                 .collect::<Vec<_>>()

@@ -41,7 +41,7 @@ where
     pub(super) batch_size: usize,
     pub(super) train: bool,
     pub(super) critic_loss: CriticLoss,
-    pub(super) reward_scale: f32,
+    pub(super) reward_scale: f64,
     pub(super) replay_burffer_capacity: usize,
     pub(super) n_critics: usize,
     pub device: Option<Device>,
@@ -161,7 +161,7 @@ where
     /// Reward scale.
     ///
     /// It works for obtaining target values, not the values in logs.
-    pub fn reward_scale(mut self, v: f32) -> Self {
+    pub fn reward_scale(mut self, v: f64) -> Self {
         self.reward_scale = v;
         self
     }

@@ -42,5 +42,5 @@ pub trait ReplayBufferBase: ExperienceBufferBase {
     ///
     /// TODO: Consider to move this method to another trait.
     /// There are cases where prioritization is not required.
-    fn update_priority(&mut self, ixs: &Option<Vec<usize>>, td_err: &Option<Vec<f32>>);
+    fn update_priority(&mut self, ixs: &Option<Vec<usize>>, td_err: &Option<Vec<f64>>);
 }

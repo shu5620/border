@@ -38,7 +38,7 @@ pub struct AleConfig {
     pub color_averaging: bool, // average the last 2 frames
     ///
     pub frame_skip: i32, // 1 is no skip
-    pub repeat_action_probability: f32,
+    pub repeat_action_probability: f64,
     pub record_screen_dir: Option<PathBuf>,
     ///
     pub difficulty_setting: i32,

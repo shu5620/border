@@ -6,13 +6,13 @@ use std::{fmt::Debug, marker::PhantomData};
 #[derive(Clone, Debug)]
 pub struct PyGymEnvContinuousAct<S: Shape> {
     /// Stores an action.
-    pub act: ArrayD<f32>,
+    pub act: ArrayD<f64>,
     pub(crate) phantom: PhantomData<S>,
 }
 
 impl<S: Shape> PyGymEnvContinuousAct<S> {
     /// Constructs an action.
-    pub fn new(act: ArrayD<f32>) -> Self {
+    pub fn new(act: ArrayD<f64>) -> Self {
         Self {
             act,
             phantom: PhantomData,

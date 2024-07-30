@@ -36,16 +36,16 @@ const REPLAY_BUFFER_CAPACITY: usize = 100_000;
 const N_EPISODES_PER_EVAL: usize = 5;
 const MODEL_DIR: &str = "./border/examples/model/sac_lunarlander_cont";
 
-type PyObsDtype = f32;
+type PyObsDtype = f64;
 
 shape!(ObsShape, [DIM_OBS as _]);
 shape!(ActShape, [DIM_ACT as _]);
 
 #[derive(Clone, Debug, Obs)]
-struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f32>);
+struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f64>);
 
 #[derive(Clone, SubBatch)]
-struct ObsBatch(TensorSubBatch<ObsShape, f32>);
+struct ObsBatch(TensorSubBatch<ObsShape, f64>);
 
 impl From<Obs> for ObsBatch {
     fn from(obs: Obs) -> Self {
@@ -58,7 +58,7 @@ impl From<Obs> for ObsBatch {
 struct Act(PyGymEnvContinuousAct<ActShape>);
 
 #[derive(SubBatch)]
-struct ActBatch(TensorSubBatch<ActShape, f32>);
+struct ActBatch(TensorSubBatch<ActShape, f64>);
 
 impl From<Act> for ActBatch {
     fn from(act: Act) -> Self {
@@ -67,7 +67,7 @@ impl From<Act> for ActBatch {
     }
 }
 
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f64, Obs>;
 type ActFilter = PyGymEnvContinuousActRawFilter<ActShape, Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 type StepProc = SimpleStepProcessor<Env, ObsBatch, ActBatch>;
@@ -77,9 +77,9 @@ type ReplayBuffer = SimpleReplayBuffer<ObsBatch, ActBatch>;
 struct LunarlanderRecord {
     episode: usize,
     step: usize,
-    reward: f32,
-    obs: Vec<f32>,
-    act: Vec<f32>,
+    reward: f64,
+    obs: Vec<f64>,
+    act: Vec<f64>,
 }
 
 impl TryFrom<&Record> for LunarlanderRecord {

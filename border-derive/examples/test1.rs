@@ -8,10 +8,10 @@ shape!(ObsShape, [4]);
 shape!(ActShape, [1]);
 
 #[derive(Debug, Clone, Obs)]
-struct Obs(PyGymEnvObs<ObsShape, f64, f32>);
+struct Obs(PyGymEnvObs<ObsShape, f64, f64>);
 
 #[derive(SubBatch)]
-struct ObsBatch(TensorSubBatch<ObsShape, f32>);
+struct ObsBatch(TensorSubBatch<ObsShape, f64>);
 
 impl From<Obs> for ObsBatch {
     fn from(obs: Obs) -> Self {

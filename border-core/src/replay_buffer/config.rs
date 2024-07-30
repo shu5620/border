@@ -12,11 +12,11 @@ use super::{WeightNormalizer, WeightNormalizer::All};
 /// Configuration for prioritized experience replay.
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 pub struct PerConfig {
-    pub(super) alpha: f32,
+    pub(super) alpha: f64,
     /// Initial value of $\beta$.
-    pub(super) beta_0: f32,
+    pub(super) beta_0: f64,
     /// Final value of $\beta$.
-    pub(super) beta_final: f32,
+    pub(super) beta_final: f64,
     /// Optimization step when beta reaches its final value.
     pub(super) n_opts_final: usize,
     /// How to normalize the weights.
@@ -37,19 +37,19 @@ impl Default for PerConfig {
 
 impl PerConfig {
     /// Sets alpha, the exponent of sampling probability.
-    pub fn alpha(mut self, alpha: f32) -> Self {
+    pub fn alpha(mut self, alpha: f64) -> Self {
         self.alpha = alpha;
         self
     }
 
     /// Sets beta_0, the initial value of the exponent of importance weights.
-    pub fn beta_0(mut self, beta_0: f32) -> Self {
+    pub fn beta_0(mut self, beta_0: f64) -> Self {
         self.beta_0 = beta_0;
         self
     }
 
     /// Sets beta_final, the final value of the exponent of importance weights.
-    pub fn beta_final(mut self, beta_final: f32) -> Self {
+    pub fn beta_final(mut self, beta_final: f64) -> Self {
         self.beta_final = beta_final;
         self
     }

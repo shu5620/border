@@ -108,7 +108,7 @@ where
     /// Resets the environment, the obs/act filters and returns the observation tensor.
     ///
     /// If `is_done` is None, all environemnts are resetted.
-    /// Otherwise, `is_done` is `Vec<f32>` and environments with `is_done[i] == 1.0` are resetted.
+    /// Otherwise, `is_done` is `Vec<f64>` and environments with `is_done[i] == 1.0` are resetted.
     fn reset(&mut self, is_done: Option<&Vec<i8>>) -> Result<O> {
         trace!("PyVecGymEnv::reset()");
 
@@ -143,9 +143,9 @@ where
 
             // Reward and is_done
             let reward = step.get_item(1).to_object(py);
-            let reward: Vec<f32> = reward.extract(py).unwrap();
+            let reward: Vec<f64> = reward.extract(py).unwrap();
             let is_done = step.get_item(2).to_object(py);
-            let is_done: Vec<f32> = is_done.extract(py).unwrap();
+            let is_done: Vec<f64> = is_done.extract(py).unwrap();
             let is_done: Vec<i8> = is_done.into_iter().map(|x| x as i8).collect();
             let n = obs.len();
 

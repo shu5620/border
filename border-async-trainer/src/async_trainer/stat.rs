@@ -2,13 +2,13 @@ use std::time::Duration;
 /// Stats of [AsyncTrainer](crate::AsyncTrainer)`::train()`.
 pub struct AsyncTrainStat {
     /// The number of samples pushed to the replay buffer per second.
-    pub samples_per_sec: f32,
+    pub samples_per_sec: f64,
 
     /// Duration of training.
     pub duration: Duration,
 
     /// The number of optimization steps per second.
-    pub opt_per_sec: f32,
+    pub opt_per_sec: f64,
 }
 
 impl AsyncTrainStat {
@@ -19,7 +19,7 @@ impl AsyncTrainStat {
             "{}, {}, {}\n",
             self.samples_per_sec,
             self.opt_per_sec,
-            self.duration.as_secs_f32()
+            self.duration.as_secs_f64()
         )
         .as_str();
         s

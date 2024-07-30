@@ -9,7 +9,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let field_type = get_field_type(data);
     let field_type_str = get_type_str(
         field_type.clone(),
-        "The item for deriving SubBatch must be a new type like SubBatch(TensorSubBatch<ObsShape, f32>)",
+        "The item for deriving SubBatch must be a new type like SubBatch(TensorSubBatch<ObsShape, f64>)",
     );
 
     let output = if field_type_str == "TensorSubBatch" {

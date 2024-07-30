@@ -107,9 +107,9 @@ impl GymEnv<i32> for AtariRamEnv {
     fn action_space(&self) -> ActionSpace<i32> {
         Box::new(CategoricalActionSpace::new(self.available_actions.len()))
     }
-    fn state(&self, out: ndarray::ArrayViewMut<f32, ndarray::IxDyn>) -> Result<()> {
+    fn state(&self, out: ndarray::ArrayViewMut<f64, ndarray::IxDyn>) -> Result<()> {
         let mut out = out.into_dimensionality::<Ix1>()?;
-        ndarray::parallel::par_azip!((a in &mut out, &b in &self.buf1) {*a = b as f32 / 255.0;});
+        ndarray::parallel::par_azip!((a in &mut out, &b in &self.buf1) {*a = b as f64 / 255.0;});
         Ok(())
     }
     fn step(&mut self, action: ArrayD<i32>) -> Result<i32> {
@@ -144,18 +144,18 @@ impl GymEnv<i32> for AtariRgbEnv {
     fn action_space(&self) -> ActionSpace<i32> {
         Box::new(CategoricalActionSpace::new(self.available_actions.len()))
     }
-    fn state(&self, out: ndarray::ArrayViewMut<f32, ndarray::IxDyn>) -> Result<()> {
+    fn state(&self, out: ndarray::ArrayViewMut<f64, ndarray::IxDyn>) -> Result<()> {
         let mut out = out.into_dimensionality::<Ix3>()?;
         let from: ArrayView3<_> = self
             .buf1
             .view()
             .into_shape(self.state_size())?
             .into_dimensionality()?;
-        ndarray::parallel::par_azip!((a in &mut out, &b in &from) {*a = b as f32 / 255.0;});
-        // ndarray::parallel::par_azip!((a in &mut out, &b in &self.buf1) {*a = b as f32 / 255.0;});
+        ndarray::parallel::par_azip!((a in &mut out, &b in &from) {*a = b as f64 / 255.0;});
+        // ndarray::parallel::par_azip!((a in &mut out, &b in &self.buf1) {*a = b as f64 / 255.0;});
         Ok(())
     }
-    // fn state(&self) -> ArrayView<f32, IxDyn>{ self.buf2.view().into_dyn() }
+    // fn state(&self) -> ArrayView<f64, IxDyn>{ self.buf2.view().into_dyn() }
     fn step(&mut self, action: ArrayD<i32>) -> Result<i32> {
         let action = self.available_actions
             [(action.into_dimensionality::<Ix0>()?.into_scalar() - 1) as usize];

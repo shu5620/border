@@ -13,9 +13,9 @@ use ndarray::Array;
 shape!(ObsShape, [8]);
 shape!(ActShape, [2]);
 
-type Obs = PyGymEnvObs<ObsShape, f32, f32>;
+type Obs = PyGymEnvObs<ObsShape, f64, f64>;
 type Act = PyGymEnvContinuousAct<ActShape>;
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, f32, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, f64, f64, Obs>;
 type ActFilter = PyGymEnvContinuousActRawFilter<ActShape, Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 
@@ -32,8 +32,8 @@ impl Policy<Env> for RandomPolicy {
     }
 
     fn sample(&mut self, _: &Obs) -> Act {
-        let x = 2. * fastrand::f32() - 1.;
-        let y = 2. * fastrand::f32() - 1.;
+        let x = 2. * fastrand::f64() - 1.;
+        let y = 2. * fastrand::f64() - 1.;
         Act::new(Array::from(vec![x, y]).into_dyn())
     }
 }

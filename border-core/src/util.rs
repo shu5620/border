@@ -64,7 +64,7 @@ use anyhow::Result;
 // ///        Py(Python runtime) --> PyGymEnvObsFilter
 // ///    end
 // /// ```
-// pub fn eval<E: Env, P: Policy<E>>(env: &mut E, policy: &mut P, n_episodes: usize) -> Vec<f32> {
+// pub fn eval<E: Env, P: Policy<E>>(env: &mut E, policy: &mut P, n_episodes: usize) -> Vec<f64> {
 //     // TODO: check the maximum number of steps of the environment for evaluation.
 //     // If it is infinite, the number of evaluation steps should be given in place of
 //     // n_episodes.
@@ -98,7 +98,7 @@ pub fn eval_with_recorder<E, P, R>(
     policy: &mut P,
     n_episodes: usize,
     recorder: &mut R,
-) -> Result<Vec<f32>>
+) -> Result<Vec<f64>>
 where
     E: Env,
     P: Policy<E>,
@@ -152,7 +152,7 @@ pub fn eval_with_recorder2<E, P, R>(
     n_steps: usize,
     recorder: &mut R,
     prev_obs: Option<<E as Env>::Obs>,
-) -> Result<(f32, <E as Env>::Obs)>
+) -> Result<(f64, <E as Env>::Obs)>
 where
     E: Env,
     P: Policy<E>,

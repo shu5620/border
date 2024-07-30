@@ -99,10 +99,10 @@ where
         self.env.minimal_actions().len() as i64
     }
 
-    fn episodic_life_env_step(&mut self, a: &BorderAtariAct) -> (Vec<u8>, f32, i8) {
+    fn episodic_life_env_step(&mut self, a: &BorderAtariAct) -> (Vec<u8>, f64, i8) {
         let actions = self.env.minimal_actions();
         let ix = a.act;
-        let reward = self.env.step(actions[ix as usize]) as f32;
+        let reward = self.env.step(actions[ix as usize]) as f64;
         let mut done = self.env.is_game_over();
         self.was_real_done = done;
         let lives = self.env.lives();
@@ -120,8 +120,8 @@ where
         (obs, reward, done)
     }
 
-    fn skip_and_max(&mut self, a: &BorderAtariAct) -> (Vec<u8>, f32, Vec<i8>) {
-        let mut total_reward = 0f32;
+    fn skip_and_max(&mut self, a: &BorderAtariAct) -> (Vec<u8>, f64, Vec<i8>) {
+        let mut total_reward = 0f64;
         let mut done = 0;
 
         for i in 0..4 {
@@ -148,7 +148,7 @@ where
         (obs, total_reward, vec![done])
     }
 
-    fn clip_reward(&self, r: f32) -> Vec<f32> {
+    fn clip_reward(&self, r: f64) -> Vec<f64> {
         if self.train {
             if r == 0.0 {
                 vec![0.0]
@@ -170,7 +170,7 @@ where
             let i2 = buf.iter().skip(1).step_by(3);
             let i3 = buf.iter().skip(2).step_by(3);
             izip![i1, i2, i3].map(|(&b, &g, &r)|
-                ((0.299 * r as f32) + (0.587 * g as f32) + (0.114 * b as f32)) as u8
+                ((0.299 * r as f64) + (0.587 * g as f64) + (0.114 * b as f64)) as u8
             ).collect::<Vec<_>>()
         };
         // let buf = {

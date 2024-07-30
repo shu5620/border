@@ -35,16 +35,16 @@ const EVAL_INTERVAL: usize = 2_000;
 const REPLAY_BUFFER_CAPACITY: usize = 100_000;
 const N_EPISODES_PER_EVAL: usize = 5;
 
-type PyObsDtype = f32;
+type PyObsDtype = f64;
 
 shape!(ObsShape, [DIM_OBS as _]);
 shape!(ActShape, [DIM_ACT as _]);
 
 #[derive(Clone, Debug, Obs)]
-struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f32>);
+struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f64>);
 
 #[derive(Clone, SubBatch)]
-struct ObsBatch(TensorSubBatch<ObsShape, f32>);
+struct ObsBatch(TensorSubBatch<ObsShape, f64>);
 
 impl From<Obs> for ObsBatch {
     fn from(obs: Obs) -> Self {
@@ -57,7 +57,7 @@ impl From<Obs> for ObsBatch {
 struct Act(PyGymEnvContinuousAct<ActShape>);
 
 #[derive(SubBatch)]
-struct ActBatch(TensorSubBatch<ActShape, f32>);
+struct ActBatch(TensorSubBatch<ActShape, f64>);
 
 impl From<Act> for ActBatch {
     fn from(act: Act) -> Self {
@@ -81,7 +81,7 @@ impl PyGymEnvActFilter<Act> for ActFilter {
     }
 
     fn filt(&mut self, act: Act) -> (PyObject, Record) {
-        let act_filt = 2f32 * &act.0.act;
+        let act_filt = 2f64 * &act.0.act;
         let record = Record::from_slice(&[
             (
                 "act_org",
@@ -96,7 +96,7 @@ impl PyGymEnvActFilter<Act> for ActFilter {
     }
 }
 
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f64, Obs>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 type StepProc = SimpleStepProcessor<Env, ObsBatch, ActBatch>;
 type ReplayBuffer = SimpleReplayBuffer<ObsBatch, ActBatch>;
@@ -105,10 +105,10 @@ type ReplayBuffer = SimpleReplayBuffer<ObsBatch, ActBatch>;
 struct PendulumRecord {
     episode: usize,
     step: usize,
-    reward: f32,
-    obs: Vec<f32>,
-    act_org: Vec<f32>,
-    act_filt: Vec<f32>,
+    reward: f64,
+    obs: Vec<f64>,
+    act_org: Vec<f64>,
+    act_filt: Vec<f64>,
 }
 
 impl TryFrom<&Record> for PendulumRecord {

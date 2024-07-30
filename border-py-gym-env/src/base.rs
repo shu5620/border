@@ -241,7 +241,7 @@ where
             let step: &PyTuple = ret.extract(py).unwrap();
             let obs = step.get_item(0).to_owned();
             let (obs, record_o) = self.obs_filter.filt(obs.to_object(py));
-            let reward: Vec<f32> = vec![step.get_item(1).extract().unwrap()];
+            let reward: Vec<f64> = vec![step.get_item(1).extract().unwrap()];
             let mut is_done: Vec<i8> = vec![if step.get_item(2).extract().unwrap() {
                 1
             } else {
@@ -295,8 +295,8 @@ where
             env.call_method("seed", (seed,), None)?;
             env
         } else if !config.pybullet {
-            let gym = py.import("f32_wrapper")?;
-            let env = gym.getattr("make_f32")?.call((name,), None)?;
+            let gym = py.import("f64_wrapper")?;
+            let env = gym.getattr("make_f64")?.call((name,), None)?;
             env.call_method("seed", (seed,), None)?;
             env
         } else {

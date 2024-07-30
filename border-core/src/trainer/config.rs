@@ -12,7 +12,7 @@ use std::{
 pub struct TrainerConfig {
     pub(super) max_opts: usize,
     pub(super) eval_episodes: usize,
-    pub(super) eval_threshold: Option<f32>,
+    pub(super) eval_threshold: Option<f64>,
     pub(super) model_dir: Option<String>,
     pub(super) opt_interval: usize,
     pub(super) eval_interval: usize,
@@ -55,7 +55,7 @@ impl TrainerConfig {
     }
 
     /// Sets the evaluation threshold.
-    pub fn eval_threshold(mut self, v: f32) -> Self {
+    pub fn eval_threshold(mut self, v: f64) -> Self {
         self.eval_threshold = Some(v);
         self
     }

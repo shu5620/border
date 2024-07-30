@@ -39,7 +39,7 @@ where
     obs: O,
     act: A,
     next_obs: O,
-    reward: Vec<f32>,
+    reward: Vec<f64>,
     is_done: Vec<i8>,
     rng: StdRng,
     per_state: Option<PerState>,
@@ -51,7 +51,7 @@ where
     A: SubBatch,
 {
     #[inline]
-    fn push_reward(&mut self, i: usize, b: &Vec<f32>) {
+    fn push_reward(&mut self, i: usize, b: &Vec<f64>) {
         let mut j = i;
         for r in b.iter() {
             self.reward[j] = *r;
@@ -74,7 +74,7 @@ where
         }
     }
 
-    fn sample_reward(&self, ixs: &Vec<usize>) -> Vec<f32> {
+    fn sample_reward(&self, ixs: &Vec<usize>) -> Vec<f64> {
         ixs.iter().map(|ix| self.reward[*ix]).collect()
     }
 
@@ -186,7 +186,7 @@ where
         })
     }
 
-    fn update_priority(&mut self, ixs: &Option<Vec<usize>>, td_errs: &Option<Vec<f32>>) {
+    fn update_priority(&mut self, ixs: &Option<Vec<usize>>, td_errs: &Option<Vec<f64>>) {
         if let Some(per_state) = &mut self.per_state {
             let ixs = ixs
                 .as_ref()

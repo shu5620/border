@@ -55,7 +55,7 @@ where
     <R::Batch as StdBatchBase>::ObsBatch: Into<Q::Input>,
     <R::Batch as StdBatchBase>::ActBatch: Into<Tensor>,
 {
-    fn update_critic(&mut self, buffer: &mut R) -> f32 {
+    fn update_critic(&mut self, buffer: &mut R) -> f64 {
         let batch = buffer.batch(self.batch_size).unwrap();
         let (obs, act, next_obs, reward, is_done, ixs, weight) = batch.unpack();
         let obs = obs.into();
@@ -98,7 +98,7 @@ where
                 1.0,
             );
             self.qnet.backward_step(&loss);
-            let td_errs = Vec::<f32>::from(td_errs);
+            let td_errs = Vec::<f64>::from(td_errs);
             buffer.update_priority(&ixs, &Some(td_errs));
             loss
         } else {
@@ -107,11 +107,11 @@ where
             loss
         };
 
-        f32::from(loss)
+        f64::from(loss)
     }
 
     fn opt_(&mut self, buffer: &mut R) -> Record {
-        let mut loss_critic = 0f32;
+        let mut loss_critic = 0f64;
 
         for _ in 0..self.n_updates_per_opt {
             let loss = self.update_critic(buffer);
@@ -124,7 +124,7 @@ where
             track(&mut self.qnet_tgt, &mut self.qnet, self.tau);
         }
 
-        loss_critic /= self.n_updates_per_opt as f32;
+        loss_critic /= self.n_updates_per_opt as f64;
 
         self.n_opts += 1;
 
@@ -182,7 +182,7 @@ where
                     DqnExplorer::EpsilonGreedy(egreedy) => egreedy.action(&a),
                 }
             } else {
-                if fastrand::f32() < 0.01 {
+                if fastrand::f64() < 0.01 {
                     let n_actions = a.size()[1] as i32;
                     let a = fastrand::i32(0..n_actions);
                     Tensor::from(a)

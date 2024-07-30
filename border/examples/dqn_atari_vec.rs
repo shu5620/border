@@ -44,7 +44,7 @@ impl From<Act> for Tensor {
 /// Converts Tensor to Act, called when applying actions estimated by DQN.
 /// DQN outputs Tensor, while PyGymEnv accepts Act as actions to the environment.
 impl From<Tensor> for Act {
-    /// `t` must be a 1-dimentional tensor of `f32`.
+    /// `t` must be a 1-dimentional tensor of `f64`.
     fn from(t: Tensor) -> Self {
         let data: Vec<i64> = t.into();
         let data: Vec<_> = data.iter().map(|e| *e as i32).collect();

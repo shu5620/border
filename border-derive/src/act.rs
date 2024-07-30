@@ -9,7 +9,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let field_type = get_field_type(data);
     let field_type_str = get_type_str(
         field_type.clone(),
-        "The item for deriving Act must be a new type like Act(PyGymEnvContinuousAct<ActShape, f32>)",
+        "The item for deriving Act must be a new type like Act(PyGymEnvContinuousAct<ActShape, f64>)",
     );
 
     let output = if field_type_str == "PyGymEnvContinuousAct" {
@@ -39,8 +39,8 @@ fn py_gym_env_cont_act(
     output.extend(quote! {
         impl From<#ident> for tch::Tensor {
             fn from(act: #ident) -> tch::Tensor {
-                let v = act.0.act.iter().map(|e| *e as f32).collect::<Vec<_>>();
-                let t: tch::Tensor = std::convert::TryFrom::<Vec<f32>>::try_from(v).unwrap();
+                let v = act.0.act.iter().map(|e| *e as f64).collect::<Vec<_>>();
+                let t: tch::Tensor = std::convert::TryFrom::<Vec<f64>>::try_from(v).unwrap();
 
                 // The first dimension of the action tensor is the number of processes,
                 // which is 1 for the non-vectorized environment.
@@ -49,16 +49,16 @@ fn py_gym_env_cont_act(
         }
 
         impl From<tch::Tensor> for #ident {
-            /// `t` must be a 1-dimentional tensor of `f32`.
+            /// `t` must be a 1-dimentional tensor of `f64`.
             fn from(t: tch::Tensor) -> Self {
                 // In non-vectorized environment, the batch dimension is not required, thus dropped.
                 let shape = t.size()[1..]
                     .iter()
                     .map(|x| *x as usize)
                     .collect::<Vec<_>>();
-                let act: Vec<f32> = t.into();
+                let act: Vec<f64> = t.into();
 
-                let act = ndarray::Array1::<f32>::from(act).into_shape(ndarray::IxDyn(&shape)).unwrap();
+                let act = ndarray::Array1::<f64>::from(act).into_shape(ndarray::IxDyn(&shape)).unwrap();
 
                 #ident(PyGymEnvContinuousAct::new(act))
             }

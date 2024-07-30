@@ -12,11 +12,11 @@ use std::{convert::TryFrom, fs::File};
 
 shape!(ObsShape, [4]);
 
-type PyObsDtype = f32;
+type PyObsDtype = f64;
 
-type Obs = PyGymEnvObs<ObsShape, PyObsDtype, f32>;
+type Obs = PyGymEnvObs<ObsShape, PyObsDtype, f64>;
 type Act = PyGymEnvDiscreteAct;
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f64, Obs>;
 type ActFilter = PyGymEnvDiscreteActRawFilter<Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 
@@ -42,7 +42,7 @@ impl Policy<Env> for RandomPolicy {
 struct CartpoleRecord {
     episode: usize,
     step: usize,
-    reward: f32,
+    reward: f64,
     obs: Vec<f64>,
 }
 

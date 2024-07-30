@@ -18,7 +18,7 @@ where
 
     /// If not `None`, a function in `examples/atari_wrappers.py` is called and
     /// environment wrappers for Atari will be applied.
-    /// Otherwise, a function in `f32_wrappers.py` is called to make an environment (not Atari).
+    /// Otherwise, a function in `f64_wrappers.py` is called to make an environment (not Atari).
     pub atari_wrapper: Option<AtariWrapper>,
 
     /// `true` to support rendering for PyBullet gym environment.

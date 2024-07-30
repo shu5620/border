@@ -14,7 +14,7 @@ where
     prev_obs: Option<E::Obs>,
     producer: P,
     n_frames: usize,
-    time: f32,
+    time: f64,
 }
 
 impl<E, P> SyncSampler<E, P>
@@ -29,7 +29,7 @@ where
             prev_obs: None,
             producer,
             n_frames: 0,
-            time: 0f32,
+            time: 0f64,
         }
     }
 
@@ -77,7 +77,7 @@ where
         // For counting FPS
         if let Ok(time) = now.elapsed() {
             self.n_frames += 1;
-            self.time += time.as_millis() as f32;
+            self.time += time.as_millis() as f64;
         }
 
         Ok(record)
@@ -85,13 +85,13 @@ where
 
     /// Returns frames per second, including taking action, applying it to the environment,
     /// producing transition, and pushing it into the replay buffer.
-    pub fn fps(&self) -> f32 {
-        self.n_frames as f32 / self.time * 1000f32
+    pub fn fps(&self) -> f64 {
+        self.n_frames as f64 / self.time * 1000f64
     }
 
     /// Reset stats for computing FPS.
     pub fn reset(&mut self) {
         self.n_frames = 0;
-        self.time = 0f32;
+        self.time = 0f64;
     }
 }

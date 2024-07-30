@@ -10,9 +10,9 @@ use std::default::Default;
 shape!(ObsShape, [28]);
 shape!(ActShape, [8]);
 
-type Obs = PyGymEnvObs<ObsShape, f32, f32>;
+type Obs = PyGymEnvObs<ObsShape, f64, f64>;
 type Act = PyGymEnvContinuousAct<ActShape>;
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, f32, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, f64, f64, Obs>;
 type ActFilter = PyGymEnvContinuousActRawFilter<ActShape, Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 
@@ -32,7 +32,7 @@ impl Policy<Env> for RandomPolicy {
         Act::new(
             Array::from(
                 (0..8)
-                    .map(|_| 2f32 * fastrand::f32() - 1f32)
+                    .map(|_| 2f64 * fastrand::f64() - 1f64)
                     .collect::<Vec<_>>(),
             )
             .into_dyn(),

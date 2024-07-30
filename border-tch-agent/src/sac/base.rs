@@ -19,7 +19,7 @@ type ActStd = Tensor;
 
 fn normal_logp(x: &Tensor) -> Tensor {
     let tmp: Tensor =
-        Tensor::from(-0.5 * (2.0 * std::f32::consts::PI).ln() as f32) - 0.5 * x.pow(2);
+        Tensor::from(-0.5 * (2.0 * std::f64::consts::PI).ln() as f64) - 0.5 * x.pow(2);
     tmp.sum_dim_intlist(&[-1], false, tch::Kind::Float)
 }
 
@@ -53,7 +53,7 @@ where
     pub(super) min_transitions_warmup: usize,
     pub(super) batch_size: usize,
     pub(super) train: bool,
-    pub(super) reward_scale: f32,
+    pub(super) reward_scale: f64,
     pub(super) critic_loss: CriticLoss,
     // pub(super) expr_sampling: ExperienceSampling,
     pub(super) phantom: PhantomData<(E, R)>,
@@ -81,7 +81,7 @@ where
         let z = Tensor::randn(mean.size().as_slice(), tch::kind::FLOAT_CPU).to(self.device);
         let a = (&std * &z + &mean).tanh();
         let log_p = normal_logp(&z)
-            - (Tensor::from(1f32) - a.pow(2.0) + Tensor::from(self.epsilon))
+            - (Tensor::from(1f64) - a.pow(2.0) + Tensor::from(self.epsilon))
                 .log()
                 .sum_dim_intlist(&[-1], false, tch::Kind::Float);
 
@@ -109,7 +109,7 @@ where
         qvals_min
     }
 
-    fn update_critic(&mut self, batch: R::Batch) -> f32 {
+    fn update_critic(&mut self, batch: R::Batch) -> f64 {
         let losses = {
             let (obs, act, next_obs, reward, is_done, _, _) = batch.unpack();
             let reward = Tensor::of_slice(&reward[..]).to(self.device);
@@ -122,7 +122,7 @@ where
                     let next_q = self.qvals_min(&self.qnets_tgt, &next_obs.into(), &next_a.into());
                     next_q - self.ent_coef.alpha() * next_log_p
                 });
-                self.reward_scale * reward + (1f32 - &is_done) * Tensor::from(self.gamma) * next_q
+                self.reward_scale * reward + (1f64 - &is_done) * Tensor::from(self.gamma) * next_q
             };
 
             debug_assert_eq!(tgt.size().as_slice(), [self.batch_size as i64]);
@@ -144,10 +144,10 @@ where
             qnet.backward_step(&loss);
         }
 
-        losses.iter().map(f32::from).sum::<f32>() / (self.qnets.len() as f32)
+        losses.iter().map(f64::from).sum::<f64>() / (self.qnets.len() as f64)
     }
 
-    fn update_actor(&mut self, batch: &R::Batch) -> f32 {
+    fn update_actor(&mut self, batch: &R::Batch) -> f64 {
         let loss = {
             let o = batch.obs().clone();
             let (a, log_p) = self.action_logp(&o.into());
@@ -162,7 +162,7 @@ where
 
         self.pi.backward_step(&loss);
 
-        f32::from(loss)
+        f64::from(loss)
     }
 
     fn soft_update(&mut self) {
@@ -172,8 +172,8 @@ where
     }
 
     fn opt_(&mut self, buffer: &mut R) -> Record {
-        let mut loss_critic = 0f32;
-        let mut loss_actor = 0f32;
+        let mut loss_critic = 0f64;
+        let mut loss_actor = 0f64;
 
         for _ in 0..self.n_updates_per_opt {
             let batch = buffer.batch(self.batch_size).unwrap();
@@ -182,15 +182,15 @@ where
             self.soft_update();
         }
 
-        loss_critic /= self.n_updates_per_opt as f32;
-        loss_actor /= self.n_updates_per_opt as f32;
+        loss_critic /= self.n_updates_per_opt as f64;
+        loss_actor /= self.n_updates_per_opt as f64;
 
         Record::from_slice(&[
             ("loss_critic", RecordValue::Scalar(loss_critic)),
             ("loss_actor", RecordValue::Scalar(loss_actor)),
             (
                 "ent_coef",
-                RecordValue::Scalar(self.ent_coef.alpha().double_value(&[0]) as f32),
+                RecordValue::Scalar(self.ent_coef.alpha().double_value(&[0]) as f64),
             ),
         ])
     }

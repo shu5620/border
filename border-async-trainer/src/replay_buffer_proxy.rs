@@ -89,7 +89,7 @@ impl<R: ReplayBufferBase> ReplayBufferBase for ReplayBufferProxy<R> {
         unimplemented!();
     }
 
-    fn update_priority(&mut self, _ixs: &Option<Vec<usize>>, _td_err: &Option<Vec<f32>>) {
+    fn update_priority(&mut self, _ixs: &Option<Vec<usize>>, _td_err: &Option<Vec<f64>>) {
         unimplemented!();
     }
 }

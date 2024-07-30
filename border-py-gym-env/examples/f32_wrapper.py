@@ -1,7 +1,7 @@
 import gym
 import numpy as np
 
-class F32Wrapper(gym.Wrapper):
+class f64Wrapper(gym.Wrapper):
     def __init__(self, env):
         gym.Wrapper.__init__(self, env)
 
@@ -19,6 +19,6 @@ class F32Wrapper(gym.Wrapper):
 
         return (obs, reward, done, info)
 
-def make_f32(env_name):
+def make_f64(env_name):
     env = gym.make(env_name)
-    return F32Wrapper(env)
+    return f64Wrapper(env)

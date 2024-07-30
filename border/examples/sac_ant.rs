@@ -42,16 +42,16 @@ const LR_ENT_COEF: f64 = 3e-4;
 const CRITIC_LOSS: CriticLoss = CriticLoss::SmoothL1;
 const MODEL_DIR: &str = "./border/examples/model/sac_ant";
 
-type PyObsDtype = f32;
+type PyObsDtype = f64;
 
 shape!(ObsShape, [DIM_OBS as _]);
 shape!(ActShape, [DIM_ACT as _]);
 
 #[derive(Clone, Debug, Obs)]
-struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f32>);
+struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f64>);
 
 #[derive(Clone, SubBatch)]
-struct ObsBatch(TensorSubBatch<ObsShape, f32>);
+struct ObsBatch(TensorSubBatch<ObsShape, f64>);
 
 impl From<Obs> for ObsBatch {
     fn from(obs: Obs) -> Self {
@@ -64,7 +64,7 @@ impl From<Obs> for ObsBatch {
 struct Act(PyGymEnvContinuousAct<ActShape>);
 
 #[derive(SubBatch)]
-struct ActBatch(TensorSubBatch<ActShape, f32>);
+struct ActBatch(TensorSubBatch<ActShape, f64>);
 
 impl From<Act> for ActBatch {
     fn from(act: Act) -> Self {
@@ -73,7 +73,7 @@ impl From<Act> for ActBatch {
     }
 }
 
-type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = PyGymEnvObsRawFilter<ObsShape, PyObsDtype, f64, Obs>;
 type ActFilter = PyGymEnvContinuousActRawFilter<ActShape, Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 type StepProc = SimpleStepProcessor<Env, ObsBatch, ActBatch>;

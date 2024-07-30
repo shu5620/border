@@ -146,11 +146,11 @@ where
         }
     }
 
-    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
+    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f64> {
         agent.eval();
         env.set_eval_mode();
 
-        let mut r_total = 0f32;
+        let mut r_total = 0f64;
 
         for ix in 0..self.eval_episodes {
             let mut prev_obs = env.reset_with_index(ix)?;
@@ -171,12 +171,12 @@ where
         agent.train();
         env.set_train_mode();
 
-        Ok(r_total / self.eval_episodes as f32)
+        Ok(r_total / self.eval_episodes as f64)
     }
 
     /// Do evaluation.
     #[inline(always)]
-    fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
+    fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f64) {
         let eval_reward = self.evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
@@ -199,10 +199,10 @@ where
         time: &mut SystemTime,
         samples_total: usize,
     ) {
-        let duration = time.elapsed().unwrap().as_secs_f32();
-        let ops = (*opt_steps_ as f32) / duration;
-        let sps = (*samples as f32) / duration;
-        let spo = (*samples as f32) / (*opt_steps_ as f32);
+        let duration = time.elapsed().unwrap().as_secs_f64();
+        let ops = (*opt_steps_ as f64) / duration;
+        let sps = (*samples as f64) / duration;
+        let spo = (*samples as f64) / (*opt_steps_ as f64);
         record.insert("samples_total", Scalar(samples_total as _));
         record.insert("opt_steps_per_sec", Scalar(ops));
         record.insert("samples_per_sec", Scalar(sps));
@@ -285,7 +285,7 @@ where
 
         // self.run_replay_buffer_thread(buffer.clone());
 
-        let mut max_eval_reward = f32::MIN;
+        let mut max_eval_reward = f64::MIN;
         let mut opt_steps = 0;
         let mut opt_steps_ = 0;
         let mut samples = 0;
@@ -352,9 +352,9 @@ where
         info!("Stopped training loop");
 
         let duration = time_total.elapsed().unwrap();
-        let time_total = duration.as_secs_f32();
-        let samples_per_sec = samples_total as f32 / time_total;
-        let opt_per_sec = self.max_train_steps as f32 / time_total;
+        let time_total = duration.as_secs_f64();
+        let samples_per_sec = samples_total as f64 / time_total;
+        let opt_per_sec = self.max_train_steps as f64 / time_total;
         AsyncTrainStat {
             samples_per_sec,
             duration,

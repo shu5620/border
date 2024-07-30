@@ -127,7 +127,7 @@ impl<S, T1, T2, U> PyGymEnvObsFilter<U> for FrameStackFilter<S, T1, T2, U>
 where
     S: Shape,
     T1: Element + Debug + num_traits::identities::Zero + AsPrimitive<T2>,
-    T2: 'static + Copy + num_traits::Zero + Into<f32>,
+    T2: 'static + Copy + num_traits::Zero + Into<f64>,
     U: Obs + From<PyGymEnvObs<S, T1, T2>>,
 {
     type Config = FrameStackFilterConfig;

@@ -21,7 +21,7 @@ pub struct Step<E: Env> {
     pub obs: E::Obs,
 
     /// Reward.
-    pub reward: Vec<f32>,
+    pub reward: Vec<f64>,
 
     /// Flag denoting if episode is done.
     pub is_done: Vec<i8>,
@@ -38,7 +38,7 @@ impl<E: Env> Step<E> {
     pub fn new(
         obs: E::Obs,
         act: E::Act,
-        reward: Vec<f32>,
+        reward: Vec<f64>,
         is_done: Vec<i8>,
         info: E::Info,
         init_obs: E::Obs,

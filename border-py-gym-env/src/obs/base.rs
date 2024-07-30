@@ -28,7 +28,7 @@ where
     pyo3::Python::with_gil(|py| {
         let obs: &PyArrayDyn<T1> = obs.extract(py).unwrap();
         let obs = obs.to_owned_array();
-        // let obs = obs.mapv(|elem| elem as f32);
+        // let obs = obs.mapv(|elem| elem as f64);
         let obs = obs.mapv(|elem| elem.as_());
         let obs = {
             if obs.shape().len() == S::shape().len() + 1 {
@@ -50,7 +50,7 @@ where
 /// `S` is the shape of an observation, except for batch and process dimensions.
 /// `T` is the dtype of ndarray in the Python gym environment.
 /// For some reason, the dtype of observations in Python gym environments seems to
-/// vary, f32 or f64. To get observations in Rust side, the dtype is specified as a
+/// vary, f64 or f64. To get observations in Rust side, the dtype is specified as a
 /// type parameter, instead of checking the dtype of Python array at runtime.
 #[derive(Clone, Debug)]
 pub struct PyGymEnvObs<S, T1, T2>
@@ -130,12 +130,12 @@ where
 // }
 
 #[cfg(feature = "tch")]
-impl<S, T1> From<PyGymEnvObs<S, T1, f32>> for Tensor
+impl<S, T1> From<PyGymEnvObs<S, T1, f64>> for Tensor
 where
     S: Shape,
     T1: Element + Debug,
 {
-    fn from(obs: PyGymEnvObs<S, T1, f32>) -> Tensor {
+    fn from(obs: PyGymEnvObs<S, T1, f64>) -> Tensor {
         let tmp = &obs.obs;
         Tensor::try_from(tmp).unwrap()
         // Tensor::try_from(&obs.obs).unwrap()

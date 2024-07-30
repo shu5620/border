@@ -18,7 +18,7 @@ shape!(ObsShape, [N_STACK as usize, 1, 84, 84]);
 shape!(ActShape, [1]);
 
 #[derive(Clone, Debug, Obs)]
-struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f32>);
+struct Obs(PyGymEnvObs<ObsShape, PyObsDtype, f64>);
 
 #[derive(Clone, SubBatch)]
 struct ObsBatch(TensorSubBatch<ObsShape, u8>);
@@ -34,7 +34,7 @@ impl From<Obs> for ObsBatch {
 struct Act(PyGymEnvDiscreteAct);
 
 #[derive(SubBatch)]
-struct ActBatch(TensorSubBatch<ActShape, f32>);
+struct ActBatch(TensorSubBatch<ActShape, f64>);
 
 impl From<Act> for ActBatch {
     fn from(act: Act) -> Self {
@@ -43,7 +43,7 @@ impl From<Act> for ActBatch {
     }
 }
 
-type ObsFilter = FrameStackFilter<ObsShape, PyObsDtype, f32, Obs>;
+type ObsFilter = FrameStackFilter<ObsShape, PyObsDtype, f64, Obs>;
 type ActFilter = PyGymEnvDiscreteActRawFilter<Act>;
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
 

@@ -27,10 +27,10 @@ pub trait StdBatchBase {
         Self::ObsBatch,
         Self::ActBatch,
         Self::ObsBatch,
-        Vec<f32>,
+        Vec<f64>,
         Vec<i8>,
         Option<Vec<usize>>,
-        Option<Vec<f32>>,
+        Option<Vec<f64>>,
     );
 
     /// Returns the number of samples in the batch.
@@ -46,13 +46,13 @@ pub trait StdBatchBase {
     fn next_obs(&self) -> &Self::ObsBatch;
 
     /// Returns `r_t`.
-    fn reward(&self) -> &Vec<f32>;
+    fn reward(&self) -> &Vec<f64>;
 
     /// Returns `is_done_t`.
     fn is_done(&self) -> &Vec<i8>;
 
     /// Returns `weight`. It is used for PER.
-    fn weight(&self) -> &Option<Vec<f32>>;
+    fn weight(&self) -> &Option<Vec<f64>>;
 
     /// Returns `ix_sample`. It is used for PER.
     fn ix_sample(&self) -> &Option<Vec<usize>>;

@@ -18,13 +18,13 @@ where
     pub next_obs: O,
 
     /// Rewards.
-    pub reward: Vec<f32>,
+    pub reward: Vec<f64>,
 
     /// Done flags.
     pub is_done: Vec<i8>,
 
     /// Priority weights.
-    pub weight: Option<Vec<f32>>,
+    pub weight: Option<Vec<f64>>,
 
     /// Sample indices.
     pub ix_sample: Option<Vec<usize>>,
@@ -44,10 +44,10 @@ where
         Self::ObsBatch,
         Self::ActBatch,
         Self::ObsBatch,
-        Vec<f32>,
+        Vec<f64>,
         Vec<i8>,
         Option<Vec<usize>>,
-        Option<Vec<f32>>,
+        Option<Vec<f64>>,
     ) {
         (
             self.obs,
@@ -76,7 +76,7 @@ where
         &self.next_obs
     }
 
-    fn reward(&self) -> &Vec<f32> {
+    fn reward(&self) -> &Vec<f64> {
         &self.reward
     }
 
@@ -84,7 +84,7 @@ where
         &self.is_done
     }
 
-    fn weight(&self) -> &Option<Vec<f32>> {
+    fn weight(&self) -> &Option<Vec<f64>> {
         &self.weight
     }
 

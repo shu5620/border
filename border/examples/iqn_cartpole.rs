@@ -64,7 +64,7 @@ const MODEL_DIR: &str = "border/examples/model/iqn_cartpole";
 
 shape!(ObsShape, [4]);
 shape!(ActShape, [1]);
-newtype_obs!(Obs, ObsFilter, ObsShape, f64, f32);
+newtype_obs!(Obs, ObsFilter, ObsShape, f64, f64);
 newtype_act_d!(Act, ActFilter);
 
 impl From<Obs> for Tensor {
@@ -85,7 +85,7 @@ impl From<Act> for Tensor {
 }
 
 impl From<Tensor> for Act {
-    /// `t` must be a 1-dimentional tensor of `f32`.
+    /// `t` must be a 1-dimentional tensor of `f64`.
     fn from(t: Tensor) -> Self {
         let data: Vec<i64> = t.into();
         let data: Vec<_> = data.iter().map(|e| *e as i32).collect();
@@ -94,7 +94,7 @@ impl From<Tensor> for Act {
 }
 
 type Env = PyGymEnv<Obs, Act, ObsFilter, ActFilter>;
-type ObsBuffer = TchTensorBuffer<f32, ObsShape, Obs>;
+type ObsBuffer = TchTensorBuffer<f64, ObsShape, Obs>;
 type ActBuffer = TchTensorBuffer<i64, ActShape, Act>;
 
 mod iqn_model {
@@ -254,7 +254,7 @@ fn create_env() -> Env {
 struct CartpoleRecord {
     episode: usize,
     step: usize,
-    reward: f32,
+    reward: f64,
     obs: Vec<f64>,
 }
 

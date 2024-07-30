@@ -74,7 +74,7 @@ where
         let act = act.into();
         let record = Record::from_slice(&[(
             "act",
-            RecordValue::Array1(act.act.iter().map(|v| *v as f32).collect::<Vec<_>>()),
+            RecordValue::Array1(act.act.iter().map(|v| *v as f64).collect::<Vec<_>>()),
         )]);
 
         let act = if self.vectorized {

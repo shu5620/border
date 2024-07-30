@@ -65,7 +65,7 @@ where
     <R::Batch as StdBatchBase>::ObsBatch: Into<F::Input>,
     <R::Batch as StdBatchBase>::ActBatch: Into<Tensor>,
 {
-    fn update_critic(&mut self, buffer: &mut R) -> f32 {
+    fn update_critic(&mut self, buffer: &mut R) -> f64 {
         trace!("IQN::update_critic()");
         let batch = buffer.batch(self.batch_size).unwrap();
         let (obs, act, next_obs, reward, is_done, _ixs, _weight) = batch.unpack();
@@ -154,7 +154,7 @@ where
                 diff.size().as_slice(),
                 &[batch_size, n_percent_points_tgt, n_percent_points_pred]
             );
-            // need to convert diff to vec<f32>
+            // need to convert diff to vec<f64>
             // buffer.update_priority(&ixs, &Some(diff));
 
             let tau = tau.unsqueeze(1).repeat(&[1, n_percent_points_tgt, 1]);
@@ -164,11 +164,11 @@ where
 
         self.iqn.backward_step(&loss);
 
-        f32::from(loss)
+        f64::from(loss)
     }
 
     fn opt_(&mut self, buffer: &mut R) -> Record {
-        let mut loss_critic = 0f32;
+        let mut loss_critic = 0f64;
 
         for _ in 0..self.n_updates_per_opt {
             let loss = self.update_critic(buffer);
@@ -181,7 +181,7 @@ where
             track(&mut self.iqn_tgt, &mut self.iqn, self.tau);
         }
 
-        loss_critic /= self.n_updates_per_opt as f32;
+        loss_critic /= self.n_updates_per_opt as f64;
 
         self.n_opts += 1;
 
@@ -313,12 +313,12 @@ where
 
     //     // Do optimization
     //     if do_optimize {
-    //         let mut loss_critic = 0f32;
+    //         let mut loss_critic = 0f64;
 
     //         for _ in 0..self.n_updates_per_opt {
     //             let batch = self
     //                 .replay_buffer
-    //                 .random_batch(self.batch_size, 0f32)
+    //                 .random_batch(self.batch_size, 0f64)
     //                 .unwrap();
     //             trace!("Sample random batch");
 
@@ -332,7 +332,7 @@ where
     //             trace!("Update target network");
     //         }
 
-    //         loss_critic /= self.n_updates_per_opt as f32;
+    //         loss_critic /= self.n_updates_per_opt as f64;
 
     //         Some(Record::from_slice(&[(
     //             "loss_critic",

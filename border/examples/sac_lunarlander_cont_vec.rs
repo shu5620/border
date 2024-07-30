@@ -25,7 +25,7 @@ const TAU: f64 = 0.001;
 const ALPHA: f64 = 0.5;
 // const TARGET_ENTROPY: f64 = -(ACT_DIM as f64);
 // const LR_ENT_COEF: f64 = 3e-4;
-const REWARD_SCALE: f32 = 1.0;
+const REWARD_SCALE: f64 = 1.0;
 const CRITIC_LOSS: CriticLoss = CriticLoss::SmoothL1;
 const OPT_INTERVAL: OptInterval = OptInterval::Steps(1);
 const MAX_OPTS: usize = 200_000;
@@ -37,7 +37,7 @@ const MODEL_DIR: &str = "./border/examples/model/sac_lunarlander_cont_vec";
 
 shape!(ObsShape, [8]);
 shape!(ActShape, [2]);
-newtype_obs!(Obs, ObsFilter, ObsShape, f32, f32);
+newtype_obs!(Obs, ObsFilter, ObsShape, f64, f64);
 newtype_act_c!(Act, ActFilter, ActShape);
 
 impl From<Obs> for Tensor {
@@ -55,27 +55,27 @@ impl From<Act> for Tensor {
             .iter()
             .map(|e| *e as i64)
             .collect::<Vec<_>>();
-        let v = act.0.act.iter().map(|e| *e as f32).collect::<Vec<_>>();
-        let t: Tensor = TryFrom::<Vec<f32>>::try_from(v).unwrap();
+        let v = act.0.act.iter().map(|e| *e as f64).collect::<Vec<_>>();
+        let t: Tensor = TryFrom::<Vec<f64>>::try_from(v).unwrap();
         t.reshape(&shape[..])
     }
 }
 
 impl From<Tensor> for Act {
-    /// `t` must be a 1-dimentional tensor of `f32`.
+    /// `t` must be a 1-dimentional tensor of `f64`.
     fn from(t: Tensor) -> Self {
         // The first dimension is batch size.
         let shape = t.size().iter().map(|x| *x as usize).collect::<Vec<_>>();
-        let act: Vec<f32> = t.into();
-        let act = Array1::<f32>::from(act).into_shape(IxDyn(&shape)).unwrap();
+        let act: Vec<f64> = t.into();
+        let act = Array1::<f64>::from(act).into_shape(IxDyn(&shape)).unwrap();
 
         Act(PyGymEnvContinuousAct::new(act))
     }
 }
 
 type Env = PyVecGymEnv<Obs, Act, ObsFilter, ActFilter>;
-type ObsBuffer = TchTensorBuffer<f32, ObsShape, Obs>;
-type ActBuffer = TchTensorBuffer<f32, ActShape, Act>;
+type ObsBuffer = TchTensorBuffer<f64, ObsShape, Obs>;
+type ActBuffer = TchTensorBuffer<f64, ActShape, Act>;
 
 fn create_agent() -> Result<impl Agent<Env>> {
     let device = tch::Device::cuda_if_available();

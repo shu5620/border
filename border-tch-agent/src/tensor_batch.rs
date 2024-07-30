@@ -20,7 +20,7 @@ impl ZeroTensor for i32 {
     }
 }
 
-impl ZeroTensor for f32 {
+impl ZeroTensor for f64 {
     fn zeros(shape: &[i64]) -> Tensor {
         Tensor::zeros(&shape, tch::kind::FLOAT_CPU)
     }

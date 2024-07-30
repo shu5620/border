@@ -15,8 +15,8 @@ pub fn actor_stats_fmt(stats: &Vec<ActorStat>) -> String {
     let mut s = "actor_id, samples, samples/sec, duration\n".to_string();
     for (i, stat) in stats.iter().enumerate() {
         let n = stat.env_steps;
-        let d = stat.duration.as_secs_f32();
-        let p = (n as f32) / d;
+        let d = stat.duration.as_secs_f64();
+        let p = (n as f64) / d;
         s += format!("{}, {}, {}, {}\n", i, n, p, d).as_str();
     }
     s
