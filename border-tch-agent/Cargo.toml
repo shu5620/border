@@ -23,7 +23,7 @@ thiserror = "1.0"
 anyhow = "1.0.38"
 chrono = "0.4"
 aquamarine = "0.1"
-tch = "0.5.0"
+tch = { git = "https://github.com/shu5620/tch-rs/", rev = "53967adf2da0337152a7ee2ba48b0acddbeae30a" }
 fastrand = "1.4.0"
 segment-tree = "2.0.0"
 

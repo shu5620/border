@@ -25,7 +25,7 @@ aquamarine = "0.1"
 fastrand = "1.4.0"
 segment-tree = "2.0.0"
 rand = "0.8.4"
-tch = "0.5.0"
+tch = { git = "https://github.com/shu5620/tch-rs/", rev = "53967adf2da0337152a7ee2ba48b0acddbeae30a" }
 
 [dev-dependencies]
 tempdir = "0.3.7"
