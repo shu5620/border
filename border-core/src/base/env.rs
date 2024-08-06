@@ -53,4 +53,7 @@ pub trait Env {
 
     /// Set to evaluate mode
     fn set_eval_mode(&mut self);
+
+    /// Return the number of environments for evaluation.
+    fn n_envs_eval(&self) -> usize;
 }

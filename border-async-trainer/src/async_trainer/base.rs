@@ -181,6 +181,36 @@ where
         Ok(r_total / self.eval_episodes as f32)
     }
 
+    // "eval_episodes" is retrieved by `Env::n_envs_eval()`
+    fn evaluate2(agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
+        agent.eval();
+        env.set_eval_mode();
+
+        let eval_episodes = env.n_envs_eval();
+        let mut r_total = 0f32;
+
+        for ix in 0..eval_episodes {
+            let mut prev_obs = env.reset_with_index(ix)?;
+            assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
+
+            loop {
+                let act = agent.sample(&prev_obs);
+                let (step, record_) = env.step(&act);
+                record.extend(record_);
+                r_total += step.reward[0];
+                if step.is_done[0] == 1 {
+                    break;
+                }
+                prev_obs = step.obs;
+            }
+        }
+
+        agent.train();
+        env.set_train_mode();
+
+        Ok(r_total / eval_episodes as f32)
+    }
+    
     /// Do evaluation.
     #[inline(always)]
     fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
@@ -200,7 +230,7 @@ where
     #[inline(always)]
     fn eval_only_recording(&mut self, agent: &mut A, envs: &mut Vec<E>, record: &mut Record, max_eval_reward: &mut f32) {
         for (i, env) in envs.iter_mut().enumerate() {
-            let eval_reward = self.evaluate(agent, env, record).unwrap();
+            let eval_reward = Self::evaluate2(agent, env, record).unwrap();
             record.insert(format!("eval_reward_only_recording_{}", i), Scalar(eval_reward));
         }
     }
