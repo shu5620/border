@@ -94,6 +94,11 @@ where
     /// Configuration of [Env]. Note that it is used only for evaluation, not for training.
     env_config: E::Config,
 
+    /// Configuration of [Env]. Note that it is used only for evaluation, not for training
+    /// and it is used only for recording the reward.
+    /// (not used for determining whether to save the model)
+    env_configs_only_recording: Vec<E::Config>,
+
     /// Sender of model info.
     model_info_sender: Sender<(usize, A::ModelInfo)>,
 
@@ -116,6 +121,7 @@ where
         config: &AsyncTrainerConfig,
         agent_config: &A::Config,
         env_config: &E::Config,
+        env_configs_only_recording: &Vec<E::Config>,
         replay_buffer_config: &R::Config,
         r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
         model_info_sender: Sender<(usize, A::ModelInfo)>,
@@ -131,6 +137,7 @@ where
             eval_episodes: config.eval_episodes,
             agent_config: agent_config.clone(),
             env_config: env_config.clone(),
+            env_configs_only_recording: env_configs_only_recording.clone(),
             replay_buffer_config: replay_buffer_config.clone(),
             r_bulk_pushed_item,
             model_info_sender,
@@ -186,6 +193,15 @@ where
             let model_dir = self.model_dir.as_ref().unwrap().clone() + "/best";
             Self::save_model(agent, model_dir);
             info!("Saved the best model");
+        }
+    }
+
+    /// Do evaluation.
+    #[inline(always)]
+    fn eval_only_recording(&mut self, agent: &mut A, envs: &mut Vec<E>, record: &mut Record, max_eval_reward: &mut f32) {
+        for (i, env) in envs.iter_mut().enumerate() {
+            let eval_reward = self.evaluate(agent, env, record).unwrap();
+            record.insert(format!("eval_reward_only_recording_{}", i), Scalar(eval_reward));
         }
     }
 
@@ -278,6 +294,19 @@ where
             env.set_train_mode();
             env
         };
+
+        let mut envs_only_recording = {
+            let mut vec = Vec::new();
+            for c in self.env_configs_only_recording.iter() {
+                let mut tmp = guard_init_env.lock().unwrap();
+                *tmp = true;
+                let mut env = E::build(c, 0).unwrap();
+                env.set_train_mode();
+                vec.push(env);
+            }
+            vec
+        };
+
         let mut agent = A::build(self.agent_config.clone());
         let mut buffer = R::build(&self.replay_buffer_config);
         // let buffer = Arc::new(Mutex::new(R::build(&self.replay_buffer_config)));
@@ -322,6 +351,7 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
+                    self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record, &mut max_eval_reward);
                     self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                 }
                 if do_record {
