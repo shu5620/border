@@ -228,7 +228,7 @@ where
         }
 
         let duration = time.elapsed().unwrap().as_secs_f32();
-        record.insert("eval_time_in_learner_per_opt_step", Scalar(duration / (self.eval_interval as f32)));
+        record.insert("eval_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
     }
 
     /// Do evaluation.
@@ -242,7 +242,7 @@ where
         }
         
         let duration = time.elapsed().unwrap().as_secs_f32();
-        record.insert("eval_only_recording_time_in_learner_per_opt_step", Scalar(duration / (self.eval_interval as f32)));
+        record.insert("eval_only_recording_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
     }
 
     /// Record.
@@ -397,7 +397,7 @@ where
                     self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record);
                     self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let duration = time_tmp.elapsed().unwrap().as_secs_f32();
-                    record.insert("eval_total_time_in_learner_per_opt_step", Scalar(duration / (self.eval_interval as f32)));
+                    record.insert("eval_total_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
                 }
                 if do_record {
                     info!("Records training logs");
