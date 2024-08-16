@@ -233,7 +233,7 @@ where
 
     /// Do evaluation.
     #[inline(always)]
-    fn eval_only_recording(&mut self, agent: &mut A, envs: &mut Vec<E>, record: &mut Record, max_eval_reward: &mut f32) {
+    fn eval_only_recording(&mut self, agent: &mut A, envs: &mut Vec<E>, record: &mut Record) {
         let time = SystemTime::now();
         
         for (i, env) in envs.iter_mut().enumerate() {
@@ -392,7 +392,7 @@ where
                 if do_eval {
                     info!("Starts evaluation of the trained model");
                     let time_tmp = SystemTime::now();            
-                    self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record, &mut max_eval_reward);
+                    self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record);
                     self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let duration = time_tmp.elapsed().unwrap().as_secs_f32();
                     record.insert("eval_total_time_in_learner_per_opt_step", Scalar(duration / (self.eval_interval as f32)));
