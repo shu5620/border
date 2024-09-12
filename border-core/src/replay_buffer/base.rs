@@ -41,6 +41,7 @@ where
     next_obs: O,
     reward: Vec<f32>,
     is_done: Vec<i8>,
+    ix_env: Vec<Option<usize>>,
     rng: StdRng,
     per_state: Option<PerState>,
 }
@@ -82,6 +83,10 @@ where
         ixs.iter().map(|ix| self.is_done[*ix]).collect()
     }
 
+    fn sample_ix_env(&self, ixs: &Vec<usize>) -> Vec<Option<usize>> {
+        ixs.iter().map(|ix| self.ix_env[*ix]).collect()
+    }
+
     /// Sets priorities for the added samples.
     fn set_priority(&mut self, batch_size: usize) {
         let sum_tree = &mut self.per_state.as_mut().unwrap().sum_tree;
@@ -107,7 +112,7 @@ where
 
     fn push(&mut self, tr: Self::PushedItem) -> Result<()> {
         let len = tr.len(); // batch size
-        let (obs, act, next_obs, reward, is_done, _, _) = tr.unpack();
+        let (obs, act, next_obs, reward, is_done, _, _, _) = tr.unpack();
         self.obs.push(self.i, obs);
         self.act.push(self.i, act);
         self.next_obs.push(self.i, next_obs);
@@ -153,6 +158,7 @@ where
             next_obs: O::new(capacity),
             reward: vec![0.; capacity],
             is_done: vec![0; capacity],
+            ix_env: vec![None; capacity],
             // rng: Rng::with_seed(config.seed),
             rng: StdRng::seed_from_u64(config.seed as _),
             per_state,
@@ -181,8 +187,9 @@ where
             next_obs: self.next_obs.sample(&ixs),
             reward: self.sample_reward(&ixs),
             is_done: self.sample_is_done(&ixs),
-            ix_sample: Some(ixs),
+            ix_sample: Some(ixs.clone()),
             weight,
+            ix_env: self.sample_ix_env(&ixs),
         })
     }
 

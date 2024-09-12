@@ -31,6 +31,7 @@ pub trait StdBatchBase {
         Vec<i8>,
         Option<Vec<usize>>,
         Option<Vec<f32>>,
+        Vec<Option<usize>>,
     );
 
     /// Returns the number of samples in the batch.
@@ -56,6 +57,9 @@ pub trait StdBatchBase {
 
     /// Returns `ix_sample`. It is used for PER.
     fn ix_sample(&self) -> &Option<Vec<usize>>;
+
+    /// Returns `ix_env`. It is used for Reward Normalization.
+    fn ix_env(&self) -> &Vec<Option<usize>>;
 
     /// Creates an empty batch.
     fn empty() -> Self;
