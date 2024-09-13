@@ -56,12 +56,13 @@ where
             let is_done = step.is_done;
             let ix_sample = None;
             let weight = None;
+            let ix_env = step.ix_env;
 
             if is_done[0] == 1 {
                 self.prev_obs.replace(step.init_obs.into());
             }
 
-            StdBatch {obs, act, next_obs, reward, is_done, ix_sample, weight}
+            StdBatch {obs, act, next_obs, reward, is_done, ix_sample, weight, ix_env}
         };
 
         batch

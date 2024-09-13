@@ -28,6 +28,9 @@ where
 
     /// Sample indices.
     pub ix_sample: Option<Vec<usize>>,
+
+    /// Environment indices
+    pub ix_env: Vec<Option<usize>>,
 }
 
 impl<O, A> StdBatchBase for StdBatch<O, A>
@@ -48,6 +51,7 @@ where
         Vec<i8>,
         Option<Vec<usize>>,
         Option<Vec<f32>>,
+        Vec<Option<usize>>,
     ) {
         (
             self.obs,
@@ -57,6 +61,7 @@ where
             self.is_done,
             self.ix_sample,
             self.weight,
+            self.ix_env,
         )
     }
 
@@ -92,6 +97,10 @@ where
         &self.ix_sample
     }
 
+    fn ix_env(&self) -> &Vec<Option<usize>> {
+        &self.ix_env
+    }
+
     fn empty() -> Self {
         Self {
             obs: O::new(0),
@@ -101,6 +110,7 @@ where
             is_done: vec![],
             ix_sample: None,
             weight: None,
+            ix_env: vec![],
         }
     }
 }
@@ -120,6 +130,7 @@ where
             is_done: vec![0; capacity],
             ix_sample: None,
             weight: None,
+            ix_env: vec![None; capacity],
         }
     }
 }

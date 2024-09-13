@@ -25,12 +25,16 @@ pub struct Step<E: Env> {
 
     /// Flag denoting if episode is done.
     pub is_done: Vec<i8>,
+    
+    /// Environment index
+    pub ix_env: Vec<Option<usize>>,
 
     /// Information defined by user.
     pub info: E::Info,
 
     /// Initial observation. If `is_done[i] == 0`, the corresponding element will not be used.
     pub init_obs: E::Obs,
+
 }
 
 impl<E: Env> Step<E> {
@@ -40,6 +44,7 @@ impl<E: Env> Step<E> {
         act: E::Act,
         reward: Vec<f32>,
         is_done: Vec<i8>,
+        ix_env: Vec<Option<usize>>,
         info: E::Info,
         init_obs: E::Obs,
     ) -> Self {
@@ -48,6 +53,7 @@ impl<E: Env> Step<E> {
             obs,
             reward,
             is_done,
+            ix_env,
             info,
             init_obs,
         }
