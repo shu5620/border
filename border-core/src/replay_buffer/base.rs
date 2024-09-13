@@ -181,6 +181,8 @@ where
             (ixs, weight)
         };
 
+        println!("self.reward all (in batch): {:?}", self.reward);
+        println!("reward (in batch): {:?}", self.sample_reward(&ixs));
         println!("self.ix_env all (in batch): {:?}", self.ix_env);
         println!("ix_env (in batch): {:?}", self.sample_ix_env(&ixs));
 
