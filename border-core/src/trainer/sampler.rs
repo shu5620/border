@@ -65,6 +65,8 @@ where
             Some(step.obs.clone())
         };
 
+        println!("step.ix_env (in border): {:?}", step.ix_env);        
+
         // Create and push transition(s)
         let transition = self.producer.process(step);
         buffer.push(transition)?;
