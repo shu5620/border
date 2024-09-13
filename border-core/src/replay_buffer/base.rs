@@ -181,6 +181,9 @@ where
             (ixs, weight)
         };
 
+        println!("self.ix_env all (in batch): {:?}", self.ix_env);
+        println!("ix_env (in batch): {:?}", self.sample_ix_env(&ixs));
+
         Ok(Self::Batch {
             obs: self.obs.sample(&ixs),
             act: self.act.sample(&ixs),
