@@ -1,4 +1,6 @@
-use crate::{AsyncTrainerConfig, PushedItemMessage, SyncModel, AsyncTrainStat};
+use crate::{
+    util::EarlyStoppingMonitor, AsyncTrainStat, AsyncTrainerConfig, PushedItemMessage, SyncModel,
+};
 use anyhow::Result;
 use border_core::{
     record::{Record, RecordValue::Scalar, Recorder},
@@ -46,7 +48,7 @@ use std::{
 /// * The model parameters of the [`Agent`] in [`AsyncTrainer`] are wrapped in
 ///   [`SyncModel::ModelInfo`] and periodically sent to the [`Agent`]s in [`Actor`]s.
 ///   [`Agent`] must implement [`SyncModel`] to synchronize its model.
-/// 
+///
 /// [`ActorManager`]: crate::ActorManager
 /// [`Actor`]: crate::Actor
 /// [`ReplayBufferBase::PushedItem`]: border_core::ReplayBufferBase::PushedItem
@@ -269,7 +271,11 @@ where
     /// These values will typically be monitored with tensorboard.
     ///
     /// [`ExperienceBufferBase::PushedItem`]: border_core::ExperienceBufferBase::PushedItem
-    pub fn train(&mut self, recorder: &mut impl Recorder, guard_init_env: Arc<Mutex<bool>>) -> AsyncTrainStat {
+    pub fn train(
+        &mut self,
+        recorder: &mut impl Recorder,
+        guard_init_env: Arc<Mutex<bool>>,
+    ) -> AsyncTrainStat {
         // TODO: error handling
         let mut env = {
             let mut tmp = guard_init_env.lock().unwrap();
@@ -284,6 +290,9 @@ where
         agent.train();
 
         // self.run_replay_buffer_thread(buffer.clone());
+
+        // Early Stoppingモニターの初期化
+        let mut early_stopping = EarlyStoppingMonitor::new(500, 50, 5000);
 
         let mut max_eval_reward = f32::MIN;
         let mut opt_steps = 0;
@@ -308,11 +317,29 @@ where
                     .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
             });
 
-            let record = agent.opt(&mut buffer);
+            let (record, loss): (Option<Record>, f64) = agent.opt(&mut buffer);
 
             if let Some(mut record) = record {
                 opt_steps += 1;
                 opt_steps_ += 1;
+
+                // Early Stopping判定
+                if early_stopping.add_value(loss) {
+                    info!(
+                        "Early stopping triggered. Best loss: {}",
+                        early_stopping.best_value().unwrap()
+                    );
+                    
+                    // モデルを保存して終了
+                    info!("Saves the trained model");
+                    self.save(opt_steps, &mut agent);
+
+                    // チャンネルをフラッシュして終了
+                    *self.stop.lock().unwrap() = true;
+                    let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                    self.sync(&agent);
+                    break;
+                }
 
                 let do_eval = opt_steps % self.eval_interval == 0;
                 let do_record = opt_steps % self.record_interval == 0;
@@ -326,7 +353,13 @@ where
                 }
                 if do_record {
                     info!("Records training logs");
-                    self.record(&mut record, &mut opt_steps_, &mut samples, &mut time, samples_total);
+                    self.record(
+                        &mut record,
+                        &mut opt_steps_,
+                        &mut samples,
+                        &mut time,
+                        samples_total,
+                    );
                 }
                 if do_flush {
                     info!("Flushes records");
