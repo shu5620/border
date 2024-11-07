@@ -106,9 +106,9 @@ pub struct EarlyStoppingMonitor {
     /// Early Stoppingを開始する前の最小ステップ数
     min_steps: usize,
     /// 値を保持するスライディングウィンドウ
-    values: VecDeque<f64>,
+    values: VecDeque<f32>,
     /// これまでの最良値（最小の損失値）
-    best_value: Option<f64>,
+    best_value: Option<f32>,
     /// 改善が見られていない連続ステップ数
     counter: usize,
     /// 合計ステップ数
@@ -140,7 +140,7 @@ impl EarlyStoppingMonitor {
     }
 
     /// 値の配列から中央値を計算
-    fn calculate_median(values: &[f64]) -> f64 {
+    fn calculate_median(values: &[f32]) -> f32 {
         let mut sorted_values = values.to_vec();
         sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
         
@@ -161,7 +161,7 @@ impl EarlyStoppingMonitor {
     /// # 戻り値
     ///
     /// * `bool` - 学習を停止すべき場合はtrue
-    pub fn add_value(&mut self, value: f64) -> bool {
+    pub fn add_value(&mut self, value: f32) -> bool {
         self.steps_counter += 1;
 
         // スライディングウィンドウに新しい値を追加
@@ -202,7 +202,7 @@ impl EarlyStoppingMonitor {
     }
 
     /// これまでの最良値（最小の損失値）を取得
-    pub fn best_value(&self) -> Option<f64> {
+    pub fn best_value(&self) -> Option<f32> {
         self.best_value
     }
 

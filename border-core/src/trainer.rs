@@ -229,7 +229,7 @@ where
         *env_steps += 1;
 
         if *env_steps % self.opt_interval == 0 {
-            let (record, _loss): (Option<Record>, f64) = agent.opt(buffer);
+            let (record, _loss): (Option<Record>, f32) = agent.opt(buffer);
             let record = record.map_or(None, |r| Some(record_.merge(r)));
             Ok(record)
         } else {

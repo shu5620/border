@@ -317,7 +317,7 @@ where
                     .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
             });
 
-            let (record, loss): (Option<Record>, f64) = agent.opt(&mut buffer);
+            let (record, loss): (Option<Record>, f32) = agent.opt(&mut buffer);
 
             if let Some(mut record) = record {
                 opt_steps += 1;
