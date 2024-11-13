@@ -1,5 +1,6 @@
 use crate::{
-    util::EarlyStoppingMonitor, AsyncTrainStat, AsyncTrainerConfig, PushedItemMessage, SyncModel,
+    util::EarlyStoppingMonitor, util::EarlyStoppingMonitorConfig, AsyncTrainStat,
+    AsyncTrainerConfig, PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
@@ -84,6 +85,9 @@ where
     /// The number of episodes for evaluation
     eval_episodes: usize,
 
+    /// Configuration of early stopping.
+    early_stopping_config: EarlyStoppingMonitorConfig,
+
     /// Receiver of pushed items.
     r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
 
@@ -131,6 +135,7 @@ where
             save_interval: config.save_interval,
             sync_interval: config.sync_interval,
             eval_episodes: config.eval_episodes,
+            early_stopping_config: config.early_stopping_config.clone(),
             agent_config: agent_config.clone(),
             env_config: env_config.clone(),
             replay_buffer_config: replay_buffer_config.clone(),
@@ -292,7 +297,7 @@ where
         // self.run_replay_buffer_thread(buffer.clone());
 
         // Early Stoppingモニターの初期化
-        let mut early_stopping = EarlyStoppingMonitor::new(500, 50, 5000);
+        let mut early_stopping = EarlyStoppingMonitor::new(self.early_stopping_config.clone());
 
         let mut max_eval_reward = f32::MIN;
         let mut opt_steps = 0;
@@ -329,7 +334,7 @@ where
                         "Early stopping triggered. Best loss: {}",
                         early_stopping.best_value().unwrap()
                     );
-                    
+
                     // モデルを保存して終了
                     info!("Saves the trained model");
                     self.save(opt_steps, &mut agent);

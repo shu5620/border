@@ -5,6 +5,7 @@ use crate::{
 use border_core::{record::TensorboardRecorder, Agent, Env, ReplayBufferBase, StepProcessorBase};
 use crossbeam_channel::{unbounded, bounded};
 use log::info;
+use serde::{Deserialize, Serialize};
 use std::{
     path::Path,
     sync::{Arc, Mutex},
@@ -95,6 +96,15 @@ pub fn train_async<A, E, R, S, P>(
     info!("{}", actor_stats_fmt(&stats));
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EarlyStoppingMonitorConfig {
+    /// 改善が見られない状態が何回続いたら停止するか
+    pub patience: usize,
+    /// 移動中央値を計算する際のウィンドウサイズ
+    pub window_size: usize,
+    /// Early Stoppingを開始する前の最小ステップ数
+    pub min_steps: usize,
+}
 
 /// 移動中央値を使用したEarly Stoppingモニター
 /// 損失値の監視に特化した実装
@@ -123,16 +133,12 @@ impl EarlyStoppingMonitor {
     /// * `patience` - 改善が見られない状態が何回続いたら停止するか
     /// * `window_size` - 移動中央値を計算する際のウィンドウサイズ
     /// * `min_steps` - Early Stoppingを開始する前の最小ステップ数
-    pub fn new(
-        patience: usize,
-        window_size: usize,
-        min_steps: usize,
-    ) -> Self {
+    pub fn new(early_stopping_config: EarlyStoppingMonitorConfig) -> Self {
         Self {
-            patience,
-            window_size,
-            min_steps,
-            values: VecDeque::with_capacity(window_size),
+            patience: early_stopping_config.patience,
+            window_size: early_stopping_config.window_size,
+            min_steps: early_stopping_config.min_steps,
+            values: VecDeque::with_capacity(early_stopping_config.window_size),
             best_value: None,
             counter: 0,
             steps_counter: 0,

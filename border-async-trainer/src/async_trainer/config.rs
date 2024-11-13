@@ -6,6 +6,8 @@ use std::{
     path::Path,
 };
 
+use crate::util::EarlyStoppingMonitorConfig;
+
 /// Configuration of [AsyncTrainer](crate::AsyncTrainer)
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AsyncTrainerConfig {
@@ -32,6 +34,10 @@ pub struct AsyncTrainerConfig {
 
     /// capacity of channel between each actor-manager and async-trainer
     pub channel_capacity: usize,
+
+    /// Configuration of early stopping.
+    pub early_stopping_config: EarlyStoppingMonitorConfig,
+
 }
 
 impl AsyncTrainerConfig {
