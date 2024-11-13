@@ -3,13 +3,13 @@ use crate::{
     actor_stats_fmt, ActorManager, ActorManagerConfig, AsyncTrainer, AsyncTrainerConfig, SyncModel,
 };
 use border_core::{record::TensorboardRecorder, Agent, Env, ReplayBufferBase, StepProcessorBase};
-use crossbeam_channel::{unbounded, bounded};
+use crossbeam_channel::{bounded, unbounded};
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
+    collections::VecDeque,
     path::Path,
     sync::{Arc, Mutex},
-    collections::VecDeque,
 };
 
 /// Runs asynchronous training.
@@ -149,7 +149,7 @@ impl EarlyStoppingMonitor {
     fn calculate_median(values: &[f32]) -> f32 {
         let mut sorted_values = values.to_vec();
         sorted_values.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        
+
         let mid = sorted_values.len() / 2;
         if sorted_values.len() % 2 == 0 {
             (sorted_values[mid - 1] + sorted_values[mid]) / 2.0
