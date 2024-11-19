@@ -342,6 +342,16 @@ where
                         early_stopping.best_value().unwrap()
                     );
 
+                    // ログを保存して終了
+                    info!("Records training logs");
+                    self.record(
+                        &mut record,
+                        &mut opt_steps_,
+                        &mut samples,
+                        &mut time,
+                        samples_total,
+                    );
+
                     // モデルを保存して終了
                     info!("Saves the trained model");
                     self.save(opt_steps, &mut agent);
@@ -361,9 +371,19 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
-                    let eval_reward = self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
+                    let eval_reward =
+                        self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     // rewardが閾値を超えたら保存して終了
                     if eval_reward >= self.early_stopping_config.reward_threshold {
+                        // ログを保存して終了
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
                         // モデルを保存して終了
                         self.save(opt_steps, &mut agent);
                         // チャンネルをフラッシュして終了
