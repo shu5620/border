@@ -183,7 +183,13 @@ where
 
     /// Do evaluation.
     #[inline(always)]
-    fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
+    fn eval(
+        &mut self,
+        agent: &mut A,
+        env: &mut E,
+        record: &mut Record,
+        max_eval_reward: &mut f32,
+    ) -> f32 {
         let eval_reward = self.evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
@@ -194,6 +200,7 @@ where
             Self::save_model(agent, model_dir);
             info!("Saved the best model");
         }
+        eval_reward
     }
 
     /// Record.
@@ -354,7 +361,17 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
-                    self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
+                    let eval_reward = self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
+                    // rewardが閾値を超えたら保存して終了
+                    if eval_reward >= self.early_stopping_config.reward_threshold {
+                        // モデルを保存して終了
+                        self.save(opt_steps, &mut agent);
+                        // チャンネルをフラッシュして終了
+                        *self.stop.lock().unwrap() = true;
+                        let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                        self.sync(&agent);
+                        break;
+                    }
                 }
                 if do_record {
                     info!("Records training logs");

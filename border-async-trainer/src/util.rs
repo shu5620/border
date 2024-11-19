@@ -104,6 +104,8 @@ pub struct EarlyStoppingMonitorConfig {
     pub window_size: usize,
     /// Early Stoppingを開始する前の最小ステップ数
     pub min_steps: usize,
+    /// 報酬による早期終了用の閾値
+    pub reward_threshold: f32,
 }
 
 /// 移動中央値を使用したEarly Stoppingモニター
