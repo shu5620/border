@@ -222,7 +222,10 @@ where
             // TODO: error handling, timeout
             // TODO: caching
             // TODO: stats
-            let msg = receiver.recv().unwrap();
+            let msg = match receiver.recv() {
+                Ok(msg) => msg,
+                Err(_) => break, // Channel disconnected, exit the loop
+            };
             _n_samples += 1;
             match sender.try_send(msg) {
                 Ok(()) => {}
