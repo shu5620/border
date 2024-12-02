@@ -16,7 +16,7 @@ pub trait Agent<E: Env, R: ReplayBufferBase>: Policy<E> {
     fn is_train(&self) -> bool;
 
     /// Do an optimization step.
-    fn opt(&mut self, buffer: &mut R) -> (Option<Record>, f32);
+    fn opt(&mut self, buffer: &mut R) -> (Option<Record>, Option<f32>);
 
     /// Save the agent in the given directory.
     /// This method commonly creates a number of files consisting the agent

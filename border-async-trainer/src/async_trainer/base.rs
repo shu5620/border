@@ -329,14 +329,19 @@ where
                     .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
             });
 
-            let (record, loss): (Option<Record>, f32) = agent.opt(&mut buffer);
+            let (record, loss): (Option<Record>, Option<f32>) = agent.opt(&mut buffer);
 
             if let Some(mut record) = record {
                 opt_steps += 1;
                 opt_steps_ += 1;
 
+                // lossがNaNの場合は無視
+                if loss.is_none() {
+                    continue;
+                }
+
                 // Early Stopping判定
-                if early_stopping.add_value(loss) {
+                if early_stopping.add_value(loss.unwrap()) {
                     info!(
                         "Early stopping triggered. Best loss: {}",
                         early_stopping.best_value().unwrap()
