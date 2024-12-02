@@ -335,39 +335,6 @@ where
                 opt_steps += 1;
                 opt_steps_ += 1;
 
-                // lossがNaNの場合は無視
-                if loss.is_none() {
-                    continue;
-                }
-
-                // Early Stopping判定
-                if early_stopping.add_value(loss.unwrap()) {
-                    info!(
-                        "Early stopping triggered. Best loss: {}",
-                        early_stopping.best_value().unwrap()
-                    );
-
-                    // ログを保存して終了
-                    info!("Records training logs");
-                    self.record(
-                        &mut record,
-                        &mut opt_steps_,
-                        &mut samples,
-                        &mut time,
-                        samples_total,
-                    );
-
-                    // モデルを保存して終了
-                    info!("Saves the trained model");
-                    self.save(opt_steps, &mut agent);
-
-                    // チャンネルをフラッシュして終了
-                    *self.stop.lock().unwrap() = true;
-                    let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
-                    self.sync(&agent);
-                    break;
-                }
-
                 let do_eval = opt_steps % self.eval_interval == 0;
                 let do_record = opt_steps % self.record_interval == 0;
                 let do_flush = do_eval || do_record;
@@ -399,14 +366,47 @@ where
                     }
                 }
                 if do_record {
-                    info!("Records training logs");
-                    self.record(
-                        &mut record,
-                        &mut opt_steps_,
-                        &mut samples,
-                        &mut time,
-                        samples_total,
-                    );
+                    // lossがNaNの場合は無視
+                    if loss.is_none() {
+                        continue;
+                    }
+
+                    // Early Stopping判定
+                    if early_stopping.add_value(loss.unwrap()) {
+                        info!(
+                            "Early stopping triggered. Best loss: {}",
+                            early_stopping.best_value().unwrap()
+                        );
+
+                        // ログを保存して終了
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
+
+                        // モデルを保存して終了
+                        info!("Saves the trained model");
+                        self.save(opt_steps, &mut agent);
+
+                        // チャンネルをフラッシュして終了
+                        *self.stop.lock().unwrap() = true;
+                        let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                        self.sync(&agent);
+                        break;
+                    } else {
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
+                    }
                 }
                 if do_flush {
                     info!("Flushes records");
