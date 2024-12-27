@@ -206,7 +206,8 @@ impl EarlyStoppingMonitor {
         }
 
         // 改善が見られない状態が続いている場合、停止を推奨
-        self.counter >= self.patience
+        // 次のStepで停止するため、counter + 1 が patience に達した場合に停止する
+        self.counter + 1 >= self.patience
     }
 
     /// これまでの最良値（最小の損失値）を取得
