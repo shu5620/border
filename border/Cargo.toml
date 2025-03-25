@@ -113,7 +113,7 @@ border-core = { version = "0.0.5", path = "../border-core" }
 border-tch-agent = { version = "0.0.5", path = "../border-tch-agent" }
 border-py-gym-env = { version = "0.0.5", path = "../border-py-gym-env" }
 border-atari-env = { version = "0.0.5", path = "../border-atari-env" }
-serde = { version = "1.0.117", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
 crossbeam-channel = "0.5.1"
 env_logger = "0.8.2"
 numpy = "0.14.1"
