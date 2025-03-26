@@ -111,6 +111,9 @@ mod trainer;
 pub use evaluator::{DefaultEvaluator, Evaluator};
 pub use trainer::{Sampler, Trainer, TrainerConfig};
 
+mod named_tensors;
+pub use named_tensors::NamedTensors;
+
 // TODO: Consider to compile this module only for tests.
 /// Agent and Env for testing.
 pub mod test {
