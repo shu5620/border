@@ -3,15 +3,7 @@ members = [
     "border-core",
     "border-tensorboard",
     "border-mlflow-tracking",
-    "border-py-gym-env",
-    "border-tch-agent",
-    "border-candle-agent",
-    "border-derive",
-    "border-atari-env",
     "border-async-trainer",
-    "border-policy-no-backend",
-    "border-minari",
-    "border",
 ]
 exclude = ["docker/"]
 
