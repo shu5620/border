@@ -29,3 +29,4 @@ abci/**
 venv/**
 
 .markdownlint.json
+.vscode/
