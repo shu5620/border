@@ -1,4 +1,4 @@
-use crate::{AsyncTrainerConfig, PushedItemMessage, SyncModel, AsyncTrainStat};
+use crate::{AsyncTrainStat, AsyncTrainerConfig, PushedItemMessage, SyncModel};
 use anyhow::Result;
 use border_core::{
     record::{Record, RecordValue::Scalar, Recorder},
@@ -46,7 +46,7 @@ use std::{
 /// * The model parameters of the [`Agent`] in [`AsyncTrainer`] are wrapped in
 ///   [`SyncModel::ModelInfo`] and periodically sent to the [`Agent`]s in [`Actor`]s.
 ///   [`Agent`] must implement [`SyncModel`] to synchronize its model.
-/// 
+///
 /// [`ActorManager`]: crate::ActorManager
 /// [`Actor`]: crate::Actor
 /// [`ReplayBufferBase::PushedItem`]: border_core::ReplayBufferBase::PushedItem
@@ -210,12 +210,12 @@ where
 
         Ok(r_total / eval_episodes as f32)
     }
-    
+
     /// Do evaluation.
     #[inline(always)]
     fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
         let time = SystemTime::now();
-        
+
         let eval_reward = self.evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
@@ -228,21 +228,30 @@ where
         }
 
         let duration = time.elapsed().unwrap().as_secs_f32();
-        record.insert("eval_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
+        record.insert(
+            "eval_time_in_learner_per_opt_steps",
+            Scalar(duration / (self.eval_interval as f32)),
+        );
     }
 
     /// Do evaluation.
     #[inline(always)]
     fn eval_only_recording(&mut self, agent: &mut A, envs: &mut Vec<E>, record: &mut Record) {
         let time = SystemTime::now();
-        
+
         for (i, env) in envs.iter_mut().enumerate() {
             let eval_reward = Self::evaluate2(agent, env, record).unwrap();
-            record.insert(format!("eval_reward_only_recording_{}", i), Scalar(eval_reward));
+            record.insert(
+                format!("eval_reward_only_recording_{}", i),
+                Scalar(eval_reward),
+            );
         }
-        
+
         let duration = time.elapsed().unwrap().as_secs_f32();
-        record.insert("eval_only_recording_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
+        record.insert(
+            "eval_only_recording_time_in_learner_per_opt_steps",
+            Scalar(duration / (self.eval_interval as f32)),
+        );
     }
 
     /// Record.
@@ -327,7 +336,11 @@ where
     /// These values will typically be monitored with tensorboard.
     ///
     /// [`ExperienceBufferBase::PushedItem`]: border_core::ExperienceBufferBase::PushedItem
-    pub fn train(&mut self, recorder: &mut impl Recorder, guard_init_env: Arc<Mutex<bool>>) -> AsyncTrainStat {
+    pub fn train(
+        &mut self,
+        recorder: &mut impl Recorder,
+        guard_init_env: Arc<Mutex<bool>>,
+    ) -> AsyncTrainStat {
         // TODO: error handling
         let mut env = {
             let mut tmp = guard_init_env.lock().unwrap();
@@ -393,15 +406,24 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
-                    let time_tmp = SystemTime::now();            
+                    let time_tmp = SystemTime::now();
                     self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record);
                     self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let duration = time_tmp.elapsed().unwrap().as_secs_f32();
-                    record.insert("eval_total_time_in_learner_per_opt_steps", Scalar(duration / (self.eval_interval as f32)));
+                    record.insert(
+                        "eval_total_time_in_learner_per_opt_steps",
+                        Scalar(duration / (self.eval_interval as f32)),
+                    );
                 }
                 if do_record {
                     info!("Records training logs");
-                    self.record(&mut record, &mut opt_steps_, &mut samples, &mut time, samples_total);
+                    self.record(
+                        &mut record,
+                        &mut opt_steps_,
+                        &mut samples,
+                        &mut time,
+                        samples_total,
+                    );
                 }
                 if do_flush {
                     info!("Flushes records");
