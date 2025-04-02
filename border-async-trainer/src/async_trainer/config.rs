@@ -27,9 +27,6 @@ pub struct AsyncTrainerConfig {
     /// Interval of synchronizing model parameters in training steps.
     pub sync_interval: usize,
 
-    /// The number of episodes for evaluation
-    pub eval_episodes: usize,
-
     /// capacity of channel between each actor-manager and async-trainer
     pub channel_capacity: usize,
 }

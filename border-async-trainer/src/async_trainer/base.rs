@@ -79,9 +79,6 @@ where
     /// Interval of synchronizing model parameters in training steps.
     sync_interval: usize,
 
-    /// The number of episodes for evaluation
-    eval_episodes: usize,
-
     /// Receiver of pushed items.
     r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
 
@@ -134,7 +131,6 @@ where
             max_train_steps: config.max_train_steps,
             save_interval: config.save_interval,
             sync_interval: config.sync_interval,
-            eval_episodes: config.eval_episodes,
             agent_config: agent_config.clone(),
             env_config: env_config.clone(),
             env_configs_only_recording: env_configs_only_recording.clone(),
@@ -153,36 +149,7 @@ where
         }
     }
 
-    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
-        agent.eval();
-        env.set_eval_mode();
-
-        let mut r_total = 0f32;
-
-        for ix in 0..self.eval_episodes {
-            let mut prev_obs = env.reset_with_index(ix)?;
-            assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
-
-            loop {
-                let act = agent.sample(&prev_obs);
-                let (step, record_) = env.step(&act);
-                record.extend(record_);
-                r_total += step.reward[0];
-                if step.is_done[0] == 1 {
-                    break;
-                }
-                prev_obs = step.obs;
-            }
-        }
-
-        agent.train();
-        env.set_train_mode();
-
-        Ok(r_total / self.eval_episodes as f32)
-    }
-
-    // "eval_episodes" is retrieved by `Env::n_envs_eval()`
-    fn evaluate2(agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
+    fn evaluate(agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
         agent.eval();
         env.set_eval_mode();
 
@@ -216,7 +183,7 @@ where
     fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
         let time = SystemTime::now();
 
-        let eval_reward = self.evaluate(agent, env, record).unwrap();
+        let eval_reward = Self::evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
         // Save the best model up to the current iteration
@@ -240,7 +207,7 @@ where
         let time = SystemTime::now();
 
         for (i, env) in envs.iter_mut().enumerate() {
-            let eval_reward = Self::evaluate2(agent, env, record).unwrap();
+            let eval_reward = Self::evaluate(agent, env, record).unwrap();
             record.insert(
                 format!("eval_reward_only_recording_{}", i),
                 Scalar(eval_reward),

@@ -119,9 +119,6 @@ where
 
     /// The maximal number of optimization steps.
     pub max_opts: usize,
-
-    /// The number of episodes for evaluation.
-    pub eval_episodes: usize,
 }
 
 impl<E, P, R> Trainer<E, P, R>
@@ -151,7 +148,6 @@ where
             eval_interval: config.eval_interval,
             save_interval: config.save_interval,
             max_opts: config.max_opts,
-            eval_episodes: config.eval_episodes,
         }
     }
 
@@ -173,7 +169,7 @@ where
     }
 
     /// Run episodes with the given agent and returns the average of cumulative reward.
-    fn evaluate<A>(&mut self, agent: &mut A, record: &mut Record) -> Result<f32>
+    fn evaluate<A>(&self, agent: &mut A, record: &mut Record) -> Result<f32>
     where
         A: Agent<E, R>,
     {
@@ -187,9 +183,10 @@ where
 
         let mut env = E::build(env_config, 0)?; // TODO use eval_env_config
         env.set_eval_mode();
+        let eval_episodes = env.n_envs_eval();
         let mut r_total = 0f32;
 
-        for ix in 0..self.eval_episodes {
+        for ix in 0..eval_episodes {
             let mut prev_obs = env.reset_with_index(ix)?;
             assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
 
@@ -208,7 +205,7 @@ where
         agent.train();
         env.set_train_mode();
 
-        Ok(r_total / self.eval_episodes as f32)
+        Ok(r_total / eval_episodes as f32)
     }
 
     /// Performs a training step.
