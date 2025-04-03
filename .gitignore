@@ -31,3 +31,5 @@ venv/**
 .markdownlint.json
 .vscode/
 rust-toolchain.toml
+.cargo/
+.venv/
