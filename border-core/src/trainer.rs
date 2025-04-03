@@ -183,10 +183,9 @@ where
 
         let mut env = E::build(env_config, 0)?; // TODO use eval_env_config
         env.set_eval_mode();
-        let eval_episodes = env.n_envs_eval();
         let mut r_total = 0f32;
 
-        for ix in 0..eval_episodes {
+        for ix in env.indices_for_eval() {
             let mut prev_obs = env.reset_with_index(ix)?;
             assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
 
@@ -205,7 +204,7 @@ where
         agent.train();
         env.set_train_mode();
 
-        Ok(r_total / eval_episodes as f32)
+        Ok(r_total / env.indices_for_eval().len() as f32)
     }
 
     /// Performs a training step.
