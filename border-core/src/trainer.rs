@@ -190,7 +190,7 @@ where
             assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
 
             loop {
-                let act = agent.sample(&prev_obs);
+                let act = agent.sample(prev_obs);
                 let (step, record_) = env.step(&act);
                 record.extend(record_);
                 r_total += step.reward[0];

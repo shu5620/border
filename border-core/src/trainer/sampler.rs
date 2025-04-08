@@ -54,7 +54,7 @@ where
         }
 
         // Sample action(s) and apply it to environment(s)
-        let act = agent.sample(self.prev_obs.as_ref().unwrap());
+        let act = agent.sample(self.prev_obs.take().unwrap());
         let (step, record) = self.env.step_with_reset(&act);
         let terminate_episode = step.is_done[0] == 1; // not support vectorized env
 

@@ -14,5 +14,5 @@ pub trait Policy<E: Env> {
     fn build(config: Self::Config) -> Self;
 
     /// Sample an action given an observation.
-    fn sample(&mut self, obs: &E::Obs) -> E::Act;
+    fn sample(&mut self, obs: E::Obs) -> E::Act;
 }

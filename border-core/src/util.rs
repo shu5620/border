@@ -114,7 +114,7 @@ where
         let mut r_total = 0.0;
 
         loop {
-            let act = policy.sample(&prev_obs);
+            let act = policy.sample(prev_obs);
             let (step, mut record) = env.step(&act);
             r_total += step.reward[0];
             prev_obs = step.obs;
@@ -167,7 +167,7 @@ where
     };
 
     for t in 0..n_steps {
-        let act = policy.sample(&prev_obs);
+        let act = policy.sample(prev_obs);
         let (step, mut record) = env.step(&act);
         r_total += step.reward[0];
         prev_obs = step.obs;
