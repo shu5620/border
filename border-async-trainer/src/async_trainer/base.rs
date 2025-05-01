@@ -265,6 +265,7 @@ where
         samples: &mut usize,
         time: &mut SystemTime,
         samples_total: usize,
+        opt_sec: &mut f32,
     ) {
         let duration = time.elapsed().unwrap().as_secs_f32();
         let ops = (*opt_steps_ as f32) / duration;
@@ -276,11 +277,16 @@ where
         record.insert("time_per_opt_steps", Scalar(tpo));
         record.insert("samples_per_sec", Scalar(sps));
         record.insert("samples_per_opt_steps", Scalar(spo));
+        record.insert(
+            "opt_sec_per_opt_steps",
+            Scalar(*opt_sec / (*opt_steps_ as f32)),
+        );
         // info!("Collected samples per optimization step = {}", spo);
 
         // Reset counter
         *opt_steps_ = 0;
         *samples = 0;
+        *opt_sec = 0f32;
         *time = SystemTime::now();
     }
 
@@ -378,6 +384,7 @@ where
         let time_total = SystemTime::now();
         let mut samples_total = 0;
         let mut time = SystemTime::now();
+        let mut opt_sec = 0f32;
 
         info!("Send model info first in AsyncTrainer");
         self.sync(&mut agent);
@@ -394,7 +401,9 @@ where
                     .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
             });
 
+            let time_tmp = SystemTime::now();
             let record = agent.opt(&mut buffer);
+            opt_sec += time_tmp.elapsed().unwrap().as_secs_f32();
 
             if let Some(mut record) = record {
                 opt_steps += 1;
@@ -426,6 +435,7 @@ where
                         &mut samples,
                         &mut time,
                         samples_total,
+                        &mut opt_sec,
                     );
                 }
                 if do_flush {
