@@ -2,7 +2,7 @@
 //! Utilities for interaction of agents and environments.
 use crate::{
     record::{RecordValue, Recorder},
-    Env, Policy
+    Env, Policy,
 };
 use anyhow::Result;
 
@@ -139,12 +139,12 @@ where
 /// Runs environment steps with a given policy and recorder.
 ///
 /// This function does not support vectorized environments.
-/// 
+///
 /// * `n_steps` - The maximum number of environment steps.
 ///   The interaction loop is terminated when is_done is true before reaching `n_steps` environment steps.
 /// * `prev_obs` - The observation, applied to the policy at the first step of interaction.
 ///   If `None`, `env.reset_with_index(0)` is invoked.
-/// 
+///
 /// This function returns the sum of rewards during interaction.
 pub fn eval_with_recorder2<E, P, R>(
     env: &mut E,

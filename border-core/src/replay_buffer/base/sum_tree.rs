@@ -2,7 +2,6 @@
 //!
 //! Code is adapted from <https://github.com/jaromiru/AI-blog/blob/master/SumTree.py> and
 /// <https://github.com/openai/baselines/blob/master/baselines/deepq/replay_buffer.py>
-
 // use rand::{rngs::StdRng, RngCore};
 use segment_tree::{
     ops::{MaxIgnoreNaN, MinIgnoreNaN},
