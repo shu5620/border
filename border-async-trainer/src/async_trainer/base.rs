@@ -228,8 +228,9 @@ where
         }
 
         let duration = time.elapsed().unwrap().as_secs_f32();
+        record.insert("eval_sec", Scalar(duration));
         record.insert(
-            "eval_time_in_learner_per_opt_steps",
+            "eval_sec_amortized_per_opt_steps",
             Scalar(duration / (self.eval_interval as f32)),
         );
     }
@@ -248,8 +249,9 @@ where
         }
 
         let duration = time.elapsed().unwrap().as_secs_f32();
+        record.insert("eval_only_recording_sec", Scalar(duration));
         record.insert(
-            "eval_only_recording_time_in_learner_per_opt_steps",
+            "eval_only_recording_sec_amortized_per_opt_steps",
             Scalar(duration / (self.eval_interval as f32)),
         );
     }
@@ -410,8 +412,9 @@ where
                     self.eval_only_recording(&mut agent, &mut envs_only_recording, &mut record);
                     self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let duration = time_tmp.elapsed().unwrap().as_secs_f32();
+                    record.insert("eval_total_sec", Scalar(duration));
                     record.insert(
-                        "eval_total_time_in_learner_per_opt_steps",
+                        "eval_total_sec_amortized_per_opt_steps",
                         Scalar(duration / (self.eval_interval as f32)),
                     );
                 }
