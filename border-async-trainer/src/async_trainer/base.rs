@@ -268,15 +268,14 @@ where
         opt_sec: &mut f32,
     ) {
         let duration = time.elapsed().unwrap().as_secs_f32();
-        let ops = (*opt_steps_ as f32) / duration;
-        let tpo = duration / (*opt_steps_ as f32);
-        let sps = (*samples as f32) / duration;
-        let spo = (*samples as f32) / (*opt_steps_ as f32);
         record.insert("samples_total", Scalar(samples_total as _));
-        record.insert("opt_steps_per_sec", Scalar(ops));
-        record.insert("time_per_opt_steps", Scalar(tpo));
-        record.insert("samples_per_sec", Scalar(sps));
-        record.insert("samples_per_opt_steps", Scalar(spo));
+        record.insert("opt_steps_per_sec", Scalar((*opt_steps_ as f32) / duration));
+        record.insert("sec_per_opt_steps", Scalar(duration / (*opt_steps_ as f32)));
+        record.insert("samples_per_sec", Scalar((*samples as f32) / duration));
+        record.insert(
+            "samples_per_opt_steps",
+            Scalar((*samples as f32) / (*opt_steps_ as f32)),
+        );
         record.insert(
             "opt_sec_per_opt_steps",
             Scalar(*opt_sec / (*opt_steps_ as f32)),
