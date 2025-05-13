@@ -258,7 +258,12 @@ where
             let mut guard_init_model = guard_init_model.lock().unwrap();
             let mut model_info = model_info.lock().unwrap();
             // TODO: error handling
-            let msg = model_info_receiver.recv().unwrap();
+            let msg = match model_info_receiver.recv() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    panic!("Failed to receive model info in model_info_receiver before loop");
+                }
+            };
             assert_eq!(msg.0, 0);
             *model_info = msg;
             *guard_init_model = true;
@@ -266,7 +271,12 @@ where
 
         loop {
             // TODO: error handling
-            let msg = model_info_receiver.recv().unwrap();
+            let msg = match model_info_receiver.recv() {
+                Ok(msg) => msg,
+                Err(_) => {
+                    break;
+                }
+            };
             let mut model_info = model_info.lock().unwrap();
             *model_info = msg;
             if *stop.lock().unwrap() {
