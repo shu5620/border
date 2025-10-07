@@ -67,6 +67,13 @@ where
     /// Where to save the trained model.
     model_dir: Option<String>,
 
+    model_name: String,
+
+    /// Whether to save the best model
+    /// If true, the model is saved when the reward in eval updates the maximum.
+    /// If false, the model is saved at regular intervals according to save_interval.
+    save_best_model: bool,
+
     /// Interval of recording in training steps.
     record_interval: usize,
 
@@ -129,6 +136,8 @@ where
     ) -> Self {
         Self {
             model_dir: config.model_dir.clone(),
+            model_name: config.model_name.clone(),
+            save_best_model: config.save_best_model,
             record_interval: config.record_interval,
             eval_interval: config.eval_interval,
             max_train_steps: config.max_train_steps,
@@ -146,9 +155,10 @@ where
         }
     }
 
-    fn save_model(agent: &A, model_dir: String) {
-        match agent.save(&model_dir) {
-            Ok(()) => info!("Saved the model in {:?}", &model_dir),
+    fn save_model(&self, agent: &A) {
+        let path = std::path::Path::new(&self.model_dir.as_ref().unwrap()).join(&self.model_name);
+        match agent.save(&path) {
+            Ok(()) => info!("Saved the model in {:?}", &path),
             Err(_) => info!("Failed to save model."),
         }
     }
@@ -194,11 +204,12 @@ where
         record.insert("eval_reward", Scalar(eval_reward));
 
         // Save the best model up to the current iteration
-        if eval_reward > *max_eval_reward {
-            *max_eval_reward = eval_reward;
-            let model_dir = self.model_dir.as_ref().unwrap().clone() + "/best";
-            Self::save_model(agent, model_dir);
-            info!("Saved the best model");
+        if self.save_best_model {
+            if eval_reward > *max_eval_reward {
+                *max_eval_reward = eval_reward;
+                self.save_model(agent);
+                info!("Saved the best model");
+            }
         }
         eval_reward
     }
@@ -238,10 +249,12 @@ where
 
     /// Save model.
     #[inline]
-    fn save(&mut self, opt_steps: usize, agent: &A) {
-        let model_dir =
-            self.model_dir.as_ref().unwrap().clone() + format!("/{}", opt_steps).as_str();
-        Self::save_model(agent, model_dir);
+    fn save(&self, agent: &A) {
+        if self.save_best_model {
+            return;
+        }
+
+        self.save_model(agent);
     }
 
     /// Sync model.
@@ -357,7 +370,7 @@ where
                             samples_total,
                         );
                         // モデルを保存して終了
-                        self.save(opt_steps, &mut agent);
+                        self.save(&agent);
                         // チャンネルをフラッシュして終了
                         *self.stop.lock().unwrap() = true;
                         let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
@@ -390,7 +403,7 @@ where
 
                         // モデルを保存して終了
                         info!("Saves the trained model");
-                        self.save(opt_steps, &mut agent);
+                        self.save(&agent);
 
                         // チャンネルをフラッシュして終了
                         *self.stop.lock().unwrap() = true;
@@ -414,7 +427,7 @@ where
                 }
                 if do_save {
                     info!("Saves the trained model");
-                    self.save(opt_steps, &mut agent);
+                    self.save(&agent);
                 }
                 if opt_steps == self.max_train_steps {
                     // Flush channels

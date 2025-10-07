@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{BufReader, Write},
@@ -13,6 +13,13 @@ use crate::util::EarlyStoppingMonitorConfig;
 pub struct AsyncTrainerConfig {
     /// Where to save the trained model.
     pub model_dir: Option<String>,
+
+    pub model_name: String,
+
+    /// Whether to save the best model
+    /// If true, the model is saved when the reward in eval updates the maximum.
+    /// If false, the model is saved at regular intervals according to save_interval.
+    pub save_best_model: bool,
 
     /// Interval of recording in training steps.
     pub record_interval: usize,
@@ -37,7 +44,6 @@ pub struct AsyncTrainerConfig {
 
     /// Configuration of early stopping.
     pub early_stopping_config: EarlyStoppingMonitorConfig,
-
 }
 
 impl AsyncTrainerConfig {
