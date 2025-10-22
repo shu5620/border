@@ -397,6 +397,7 @@ where
                         self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let mut stop_reason: Option<&str> = None;
 
+                    // 動的報酬を用いた早期終了が有効なら、評価結果を取得して閾値判定を行う
                     if let Some(evaluator) = self.dynamic_reward_evaluator.as_mut() {
                         match evaluator.evaluate(&mut agent, &mut env) {
                             Ok(snapshot) => {
@@ -409,6 +410,7 @@ where
                                     );
                                 }
 
+                                // 基準値の記録および指標チェックは有限な報酬が得られた場合のみ行う
                                 if snapshot.reward.is_finite() {
                                     if self.dynamic_reward_baseline.is_none() {
                                         self.dynamic_reward_baseline = Some(snapshot.reward);
@@ -458,6 +460,7 @@ where
                         }
                     }
 
+                    // 動的判定で終了しなかった場合は、従来の報酬閾値による判定を実行
                     if stop_reason.is_none()
                         && (self.dynamic_reward_evaluator.is_none()
                             || self
