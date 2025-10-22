@@ -1,6 +1,6 @@
 use crate::{
-    util::EarlyStoppingMonitor, util::EarlyStoppingMonitorConfig, AsyncTrainStat,
-    AsyncTrainerConfig, PushedItemMessage, SyncModel,
+    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitorConfig,
+    AsyncTrainStat, AsyncTrainerConfig, PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
@@ -8,8 +8,9 @@ use border_core::{
     Agent, Env, Obs, ReplayBufferBase,
 };
 use crossbeam_channel::{Receiver, Sender};
-use log::info;
+use log::{info, warn};
 use std::{
+    collections::HashMap,
     marker::PhantomData,
     sync::{Arc, Mutex},
     time::SystemTime,
@@ -106,6 +107,12 @@ where
     /// Configuration of replay buffer.
     replay_buffer_config: R::Config,
 
+    /// Optional evaluator for dynamic-reward-based early stopping.
+    dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
+
+    /// Baseline dynamic reward captured at the first evaluation.
+    dynamic_reward_baseline: Option<f32>,
+
     phantom: PhantomData<(A, E, R)>,
 }
 
@@ -126,6 +133,7 @@ where
         r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
         model_info_sender: Sender<(usize, A::ModelInfo)>,
         stop: Arc<Mutex<bool>>,
+        dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
     ) -> Self {
         Self {
             model_dir: config.model_dir.clone(),
@@ -142,6 +150,8 @@ where
             r_bulk_pushed_item,
             model_info_sender,
             stop,
+            dynamic_reward_evaluator,
+            dynamic_reward_baseline: None,
             phantom: PhantomData,
         }
     }
@@ -304,7 +314,8 @@ where
         // self.run_replay_buffer_thread(buffer.clone());
 
         // Early Stoppingモニターの初期化
-        let mut early_stopping = EarlyStoppingMonitor::new(self.early_stopping_config.clone());
+        let mut early_stopping =
+            EarlyStoppingMonitorConfig::new(self.early_stopping_config.clone());
 
         let mut max_eval_reward = f32::MIN;
         let mut opt_steps = 0;
@@ -345,8 +356,82 @@ where
                     info!("Starts evaluation of the trained model");
                     let eval_reward =
                         self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
-                    // rewardが閾値を超えたら保存して終了
-                    if eval_reward >= self.early_stopping_config.reward_threshold {
+                    let mut stop_reason: Option<&str> = None;
+
+                    if let Some(evaluator) = self.dynamic_reward_evaluator.as_mut() {
+                        match evaluator.evaluate(&mut agent, &mut env) {
+                            Ok(snapshot) => {
+                                record.insert("dynamic_eval_reward", Scalar(snapshot.reward));
+
+                                for (metric_id, value) in snapshot.metrics.iter() {
+                                    record.insert(
+                                        format!("dynamic_eval_metric_{metric_id}"),
+                                        Scalar(*value),
+                                    );
+                                }
+
+                                if snapshot.reward.is_finite() {
+                                    if self.dynamic_reward_baseline.is_none() {
+                                        self.dynamic_reward_baseline = Some(snapshot.reward);
+                                        record.insert(
+                                            "dynamic_eval_reward_baseline",
+                                            Scalar(snapshot.reward),
+                                        );
+                                        info!(
+                                            "Captured baseline dynamic reward: {:.4}",
+                                            snapshot.reward
+                                        );
+                                    } else if let Some(baseline) = self.dynamic_reward_baseline {
+                                        record.insert(
+                                            "dynamic_eval_reward_baseline",
+                                            Scalar(baseline),
+                                        );
+
+                                        let reward_ok = snapshot.reward >= baseline;
+                                        let metrics_map: HashMap<u32, f32> = snapshot.metrics_map();
+                                        let metrics_ok = self
+                                            .early_stopping_config
+                                            .target_evaluation_index
+                                            .iter()
+                                            .all(|(id, threshold)| {
+                                                metrics_map
+                                                    .get(id)
+                                                    .map(|value| *value >= *threshold)
+                                                    .unwrap_or(false)
+                                            });
+
+                                        if reward_ok && metrics_ok {
+                                            stop_reason = Some("dynamic_reward");
+                                            info!(
+                                                "Early stopping condition satisfied by dynamic reward"
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    warn!(
+                                        "Dynamic reward evaluator returned non-finite reward; skipping early stop"
+                                    );
+                                }
+                            }
+                            Err(err) => {
+                                warn!("Failed to evaluate dynamic early stopping metrics: {}", err);
+                            }
+                        }
+                    }
+
+                    if stop_reason.is_none()
+                        && (self.dynamic_reward_evaluator.is_none()
+                            || self
+                                .early_stopping_config
+                                .target_evaluation_index
+                                .is_empty())
+                        && eval_reward >= self.early_stopping_config.reward_threshold
+                    {
+                        stop_reason = Some("reward_threshold");
+                        info!("Early stopping condition satisfied by reward threshold");
+                    }
+
+                    if let Some(_reason) = stop_reason {
                         // ログを保存して終了
                         info!("Records training logs");
                         self.record(
