@@ -1,7 +1,7 @@
 //! Utility function.
 use crate::{
     actor_stats_fmt, ActorManager, ActorManagerConfig, AsyncTrainer, AsyncTrainerConfig,
-    ExitReason, SyncModel,
+    DynamicRewardEvaluator, ExitReason, SyncModel,
 };
 use border_core::{record::TensorboardRecorder, Agent, Env, ReplayBufferBase, StepProcessorBase};
 use crossbeam_channel::{bounded, unbounded};
@@ -31,6 +31,8 @@ use std::{
 /// * `replay_buffer_config` - Configuration of the replay buffer.
 /// * `actor_man_config` - Configuration of [`ActorManager`].
 /// * `async_trainer_config` - Configuration of [`AsyncTrainer`].
+/// * `dynamic_reward_evaluator` - Optional evaluator to enable dynamic-reward based
+///   early stopping checks during evaluation.
 pub fn train_async<A, E, R, S, P>(
     model_dir: &P,
     agent_config: &A::Config,
@@ -41,6 +43,7 @@ pub fn train_async<A, E, R, S, P>(
     replay_buffer_config: &R::Config,
     actor_man_config: &ActorManagerConfig,
     async_trainer_config: &AsyncTrainerConfig,
+    dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
 ) -> ExitReason
 where
     A: Agent<E, R> + SyncModel,
@@ -85,6 +88,7 @@ where
         item_r,
         model_s,
         stop.clone(),
+        dynamic_reward_evaluator,
     );
 
     // Starts sampling and training
@@ -100,21 +104,10 @@ where
     train_stats.exit_reason
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct EarlyStoppingMonitorConfig {
-    /// 改善が見られない状態が何回続いたら停止するか
-    pub patience: usize,
-    /// 移動中央値を計算する際のウィンドウサイズ
-    pub window_size: usize,
-    /// Early Stoppingを開始する前の最小ステップ数
-    pub min_steps: usize,
-    /// 報酬による早期終了用の閾値
-    pub reward_threshold: f32,
-}
-
 /// 移動中央値を使用したEarly Stoppingモニター
 /// 損失値の監視に特化した実装
-pub struct EarlyStoppingMonitor {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EarlyStoppingMonitorConfig {
     /// 改善が見られない状態が何回続いたら停止するか
     patience: usize,
     /// 移動中央値を計算する際のウィンドウサイズ
@@ -129,9 +122,14 @@ pub struct EarlyStoppingMonitor {
     counter: usize,
     /// 合計ステップ数
     steps_counter: usize,
+    /// 報酬による早期終了用の閾値
+    pub reward_threshold: f32,
+    /// 目標達成判定用の各種性能評価指標閾値
+    /// (u32, f32) = (指標ID, 閾値)
+    pub target_evaluation_index: Vec<(u32, f32)>,
 }
 
-impl EarlyStoppingMonitor {
+impl EarlyStoppingMonitorConfig {
     /// 新しいEarlyStoppingMonitorを作成
     ///
     /// # 引数
@@ -148,6 +146,8 @@ impl EarlyStoppingMonitor {
             best_value: None,
             counter: 0,
             steps_counter: 0,
+            reward_threshold: early_stopping_config.reward_threshold,
+            target_evaluation_index: early_stopping_config.target_evaluation_index,
         }
     }
 
