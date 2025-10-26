@@ -44,6 +44,9 @@ pub struct AsyncTrainerConfig {
 
     /// Configuration of early stopping.
     pub early_stopping_config: EarlyStoppingMonitorConfig,
+
+    /// Timeout in minutes.
+    pub timeout_minutes: Option<u64>,
 }
 
 impl AsyncTrainerConfig {

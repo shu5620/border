@@ -95,6 +95,9 @@ where
     /// Configuration of early stopping.
     early_stopping_config: EarlyStoppingMonitorConfig,
 
+    /// Timeout in minutes.
+    timeout_minutes: Option<u64>,
+
     /// Receiver of pushed items.
     r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
 
@@ -145,6 +148,7 @@ where
             sync_interval: config.sync_interval,
             eval_episodes: config.eval_episodes,
             early_stopping_config: config.early_stopping_config.clone(),
+            timeout_minutes: config.timeout_minutes,
             agent_config: agent_config.clone(),
             env_config: env_config.clone(),
             replay_buffer_config: replay_buffer_config.clone(),
@@ -301,6 +305,14 @@ where
         recorder: &mut impl Recorder,
         guard_init_env: Arc<Mutex<bool>>,
     ) -> AsyncTrainStat {
+        let timeout_duration = if let Some(timeout_minutes) = self.timeout_minutes {
+            Some(std::time::Duration::from_secs(timeout_minutes * 60))
+        } else {
+            None
+        };
+
+        let start_time_for_timeout = std::time::Instant::now();
+
         // TODO: error handling
         let mut env = {
             let mut tmp = guard_init_env.lock().unwrap();
@@ -332,6 +344,18 @@ where
 
         info!("Starts training loop");
         loop {
+            if let Some(timeout_duration) = &timeout_duration {
+                if start_time_for_timeout.elapsed() >= *timeout_duration {
+                    // モデルを保存して終了
+                    self.save(&agent);
+                    // チャンネルをフラッシュして終了
+                    *self.stop.lock().unwrap() = true;
+                    let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                    self.sync(&agent);
+                    break;
+                }
+            }
+
             // Update replay buffer
             let msgs: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
             msgs.into_iter().for_each(|msg| {
