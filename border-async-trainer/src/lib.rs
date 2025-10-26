@@ -28,7 +28,7 @@ mod sync_model;
 pub mod util;
 pub use actor::{actor_stats_fmt, Actor, ActorStat};
 pub use actor_manager::{ActorManager, ActorManagerConfig};
-pub use async_trainer::{AsyncTrainStat, AsyncTrainer, AsyncTrainerConfig};
+pub use async_trainer::{AsyncTrainStat, AsyncTrainer, AsyncTrainerConfig, ExitReason};
 pub use error::BorderAsyncTrainerError;
 pub use messages::PushedItemMessage;
 pub use replay_buffer_proxy::{ReplayBufferProxy, ReplayBufferProxyConfig};

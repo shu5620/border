@@ -1,6 +1,7 @@
 //! Utility function.
 use crate::{
-    actor_stats_fmt, ActorManager, ActorManagerConfig, AsyncTrainer, AsyncTrainerConfig, SyncModel,
+    actor_stats_fmt, ActorManager, ActorManagerConfig, AsyncTrainer, AsyncTrainerConfig,
+    ExitReason, SyncModel,
 };
 use border_core::{record::TensorboardRecorder, Agent, Env, ReplayBufferBase, StepProcessorBase};
 use crossbeam_channel::{bounded, unbounded};
@@ -40,7 +41,8 @@ pub fn train_async<A, E, R, S, P>(
     replay_buffer_config: &R::Config,
     actor_man_config: &ActorManagerConfig,
     async_trainer_config: &AsyncTrainerConfig,
-) where
+) -> ExitReason
+where
     A: Agent<E, R> + SyncModel,
     E: Env,
     R: ReplayBufferBase<PushedItem = S::Output> + Send + 'static,
@@ -87,13 +89,15 @@ pub fn train_async<A, E, R, S, P>(
 
     // Starts sampling and training
     actors.run(guard_init_env.clone());
-    let stats = trainer.train(&mut recorder, guard_init_env);
+    let train_stats = trainer.train(&mut recorder, guard_init_env);
     info!("Stats of async trainer");
-    info!("{}", stats.fmt());
+    info!("{}", train_stats.fmt());
 
     let stats = actors.stop_and_join();
     info!("Stats of generated samples in actors");
     info!("{}", actor_stats_fmt(&stats));
+
+    train_stats.exit_reason
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

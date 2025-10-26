@@ -1,6 +1,6 @@
 use crate::{
     util::EarlyStoppingMonitor, util::EarlyStoppingMonitorConfig, AsyncTrainStat,
-    AsyncTrainerConfig, PushedItemMessage, SyncModel,
+    AsyncTrainerConfig, ExitReason, PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
@@ -343,7 +343,7 @@ where
         self.sync(&mut agent);
 
         info!("Starts training loop");
-        loop {
+        let exit_reason: ExitReason = loop {
             if let Some(timeout_duration) = &timeout_duration {
                 if start_time_for_timeout.elapsed() >= *timeout_duration {
                     // モデルを保存して終了
@@ -352,7 +352,7 @@ where
                     *self.stop.lock().unwrap() = true;
                     let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
                     self.sync(&agent);
-                    break;
+                    break ExitReason::Timeout;
                 }
             }
 
@@ -399,7 +399,7 @@ where
                         *self.stop.lock().unwrap() = true;
                         let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
                         self.sync(&agent);
-                        break;
+                        break ExitReason::GoalAchieved;
                     }
                 }
                 if do_record {
@@ -433,7 +433,7 @@ where
                         *self.stop.lock().unwrap() = true;
                         let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
                         self.sync(&agent);
-                        break;
+                        break ExitReason::Converged;
                     } else {
                         info!("Records training logs");
                         self.record(
@@ -458,14 +458,14 @@ where
                     *self.stop.lock().unwrap() = true;
                     let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
                     self.sync(&agent);
-                    break;
+                    break ExitReason::MaxStepsReached;
                 }
                 if do_sync {
                     info!("Sends the trained model info to ActorManager");
                     self.sync(&agent);
                 }
             }
-        }
+        };
         info!("Stopped training loop");
 
         let duration = time_total.elapsed().unwrap();
@@ -476,6 +476,7 @@ where
             samples_per_sec,
             duration,
             opt_per_sec,
+            exit_reason,
         }
     }
 }
