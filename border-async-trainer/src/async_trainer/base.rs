@@ -1,8 +1,6 @@
 use crate::{
-    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitor,
-    util::EarlyStoppingMonitorConfig, util::EarlyStoppingMonitorConfig, AsyncTrainStat,
-    AsyncTrainStat, AsyncTrainerConfig, AsyncTrainerConfig, ExitReason, PushedItemMessage,
-    PushedItemMessage, SyncModel, SyncModel,
+    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitorConfig,
+    AsyncTrainStat, AsyncTrainerConfig, ExitReason, PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
