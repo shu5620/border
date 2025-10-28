@@ -1,4 +1,7 @@
-use crate::{AsyncTrainerConfig, PushedItemMessage, SyncModel, AsyncTrainStat};
+use crate::{
+    util::EarlyStoppingMonitor, util::EarlyStoppingMonitorConfig, AsyncTrainStat,
+    AsyncTrainerConfig, PushedItemMessage, SyncModel,
+};
 use anyhow::Result;
 use border_core::{
     record::{Record, RecordValue::Scalar, Recorder},
@@ -46,7 +49,7 @@ use std::{
 /// * The model parameters of the [`Agent`] in [`AsyncTrainer`] are wrapped in
 ///   [`SyncModel::ModelInfo`] and periodically sent to the [`Agent`]s in [`Actor`]s.
 ///   [`Agent`] must implement [`SyncModel`] to synchronize its model.
-/// 
+///
 /// [`ActorManager`]: crate::ActorManager
 /// [`Actor`]: crate::Actor
 /// [`ReplayBufferBase::PushedItem`]: border_core::ReplayBufferBase::PushedItem
@@ -63,6 +66,13 @@ where
 {
     /// Where to save the trained model.
     model_dir: Option<String>,
+
+    model_name: String,
+
+    /// Whether to save the best model
+    /// If true, the model is saved when the reward in eval updates the maximum.
+    /// If false, the model is saved at regular intervals according to save_interval.
+    save_best_model: bool,
 
     /// Interval of recording in training steps.
     record_interval: usize,
@@ -81,6 +91,9 @@ where
 
     /// The number of episodes for evaluation
     eval_episodes: usize,
+
+    /// Configuration of early stopping.
+    early_stopping_config: EarlyStoppingMonitorConfig,
 
     /// Receiver of pushed items.
     r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
@@ -123,12 +136,15 @@ where
     ) -> Self {
         Self {
             model_dir: config.model_dir.clone(),
+            model_name: config.model_name.clone(),
+            save_best_model: config.save_best_model,
             record_interval: config.record_interval,
             eval_interval: config.eval_interval,
             max_train_steps: config.max_train_steps,
             save_interval: config.save_interval,
             sync_interval: config.sync_interval,
             eval_episodes: config.eval_episodes,
+            early_stopping_config: config.early_stopping_config.clone(),
             agent_config: agent_config.clone(),
             env_config: env_config.clone(),
             replay_buffer_config: replay_buffer_config.clone(),
@@ -139,9 +155,10 @@ where
         }
     }
 
-    fn save_model(agent: &A, model_dir: String) {
-        match agent.save(&model_dir) {
-            Ok(()) => info!("Saved the model in {:?}", &model_dir),
+    fn save_model(&self, agent: &A) {
+        let path = std::path::Path::new(&self.model_dir.as_ref().unwrap()).join(&self.model_name);
+        match agent.save(&path) {
+            Ok(()) => info!("Saved the model in {:?}", &path),
             Err(_) => info!("Failed to save model."),
         }
     }
@@ -176,17 +193,25 @@ where
 
     /// Do evaluation.
     #[inline(always)]
-    fn eval(&mut self, agent: &mut A, env: &mut E, record: &mut Record, max_eval_reward: &mut f32) {
+    fn eval(
+        &mut self,
+        agent: &mut A,
+        env: &mut E,
+        record: &mut Record,
+        max_eval_reward: &mut f32,
+    ) -> f32 {
         let eval_reward = self.evaluate(agent, env, record).unwrap();
         record.insert("eval_reward", Scalar(eval_reward));
 
         // Save the best model up to the current iteration
-        if eval_reward > *max_eval_reward {
-            *max_eval_reward = eval_reward;
-            let model_dir = self.model_dir.as_ref().unwrap().clone() + "/best";
-            Self::save_model(agent, model_dir);
-            info!("Saved the best model");
+        if self.save_best_model {
+            if eval_reward > *max_eval_reward {
+                *max_eval_reward = eval_reward;
+                self.save_model(agent);
+                info!("Saved the best model");
+            }
         }
+        eval_reward
     }
 
     /// Record.
@@ -224,10 +249,12 @@ where
 
     /// Save model.
     #[inline]
-    fn save(&mut self, opt_steps: usize, agent: &A) {
-        let model_dir =
-            self.model_dir.as_ref().unwrap().clone() + format!("/{}", opt_steps).as_str();
-        Self::save_model(agent, model_dir);
+    fn save(&self, agent: &A) {
+        if self.save_best_model {
+            return;
+        }
+
+        self.save_model(agent);
     }
 
     /// Sync model.
@@ -269,7 +296,11 @@ where
     /// These values will typically be monitored with tensorboard.
     ///
     /// [`ExperienceBufferBase::PushedItem`]: border_core::ExperienceBufferBase::PushedItem
-    pub fn train(&mut self, recorder: &mut impl Recorder, guard_init_env: Arc<Mutex<bool>>) -> AsyncTrainStat {
+    pub fn train(
+        &mut self,
+        recorder: &mut impl Recorder,
+        guard_init_env: Arc<Mutex<bool>>,
+    ) -> AsyncTrainStat {
         // TODO: error handling
         let mut env = {
             let mut tmp = guard_init_env.lock().unwrap();
@@ -284,6 +315,9 @@ where
         agent.train();
 
         // self.run_replay_buffer_thread(buffer.clone());
+
+        // Early Stoppingモニターの初期化
+        let mut early_stopping = EarlyStoppingMonitor::new(self.early_stopping_config.clone());
 
         let mut max_eval_reward = f32::MIN;
         let mut opt_steps = 0;
@@ -308,7 +342,7 @@ where
                     .for_each(|pushed_item| buffer.push(pushed_item).unwrap())
             });
 
-            let record = agent.opt(&mut buffer);
+            let (record, loss): (Option<Record>, Option<f32>) = agent.opt(&mut buffer);
 
             if let Some(mut record) = record {
                 opt_steps += 1;
@@ -322,11 +356,70 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
-                    self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
+                    let eval_reward =
+                        self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
+                    // rewardが閾値を超えたら保存して終了
+                    if eval_reward >= self.early_stopping_config.reward_threshold {
+                        // ログを保存して終了
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
+                        // モデルを保存して終了
+                        self.save(&agent);
+                        // チャンネルをフラッシュして終了
+                        *self.stop.lock().unwrap() = true;
+                        let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                        self.sync(&agent);
+                        break;
+                    }
                 }
                 if do_record {
-                    info!("Records training logs");
-                    self.record(&mut record, &mut opt_steps_, &mut samples, &mut time, samples_total);
+                    // lossがNaNの場合は無視
+                    if loss.is_none() {
+                        continue;
+                    }
+
+                    // Early Stopping判定
+                    if early_stopping.add_value(loss.unwrap()) {
+                        info!(
+                            "Early stopping triggered. Best loss: {}",
+                            early_stopping.best_value().unwrap()
+                        );
+
+                        // ログを保存して終了
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
+
+                        // モデルを保存して終了
+                        info!("Saves the trained model");
+                        self.save(&agent);
+
+                        // チャンネルをフラッシュして終了
+                        *self.stop.lock().unwrap() = true;
+                        let _: Vec<_> = self.r_bulk_pushed_item.try_iter().collect();
+                        self.sync(&agent);
+                        break;
+                    } else {
+                        info!("Records training logs");
+                        self.record(
+                            &mut record,
+                            &mut opt_steps_,
+                            &mut samples,
+                            &mut time,
+                            samples_total,
+                        );
+                    }
                 }
                 if do_flush {
                     info!("Flushes records");
@@ -334,7 +427,7 @@ where
                 }
                 if do_save {
                     info!("Saves the trained model");
-                    self.save(opt_steps, &mut agent);
+                    self.save(&agent);
                 }
                 if opt_steps == self.max_train_steps {
                     // Flush channels

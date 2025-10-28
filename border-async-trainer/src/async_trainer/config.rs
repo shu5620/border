@@ -1,16 +1,25 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::{BufReader, Write},
     path::Path,
 };
 
+use crate::util::EarlyStoppingMonitorConfig;
+
 /// Configuration of [AsyncTrainer](crate::AsyncTrainer)
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AsyncTrainerConfig {
     /// Where to save the trained model.
     pub model_dir: Option<String>,
+
+    pub model_name: String,
+
+    /// Whether to save the best model
+    /// If true, the model is saved when the reward in eval updates the maximum.
+    /// If false, the model is saved at regular intervals according to save_interval.
+    pub save_best_model: bool,
 
     /// Interval of recording in training steps.
     pub record_interval: usize,
@@ -32,6 +41,9 @@ pub struct AsyncTrainerConfig {
 
     /// capacity of channel between each actor-manager and async-trainer
     pub channel_capacity: usize,
+
+    /// Configuration of early stopping.
+    pub early_stopping_config: EarlyStoppingMonitorConfig,
 }
 
 impl AsyncTrainerConfig {
