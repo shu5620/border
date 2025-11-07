@@ -109,19 +109,11 @@ where
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EarlyStoppingMonitorConfig {
     /// 改善が見られない状態が何回続いたら停止するか
-    patience: usize,
+    pub patience: usize,
     /// 移動中央値を計算する際のウィンドウサイズ
-    window_size: usize,
+    pub window_size: usize,
     /// Early Stoppingを開始する前の最小ステップ数
-    min_steps: usize,
-    /// 値を保持するスライディングウィンドウ
-    values: VecDeque<f32>,
-    /// これまでの最良値（最小の損失値）
-    best_value: Option<f32>,
-    /// 改善が見られていない連続ステップ数
-    counter: usize,
-    /// 合計ステップ数
-    steps_counter: usize,
+    pub min_steps: usize,
     /// 報酬による早期終了用の閾値
     pub reward_threshold: f32,
     /// 目標達成判定用の各種性能評価指標閾値
@@ -142,15 +134,43 @@ impl EarlyStoppingMonitorConfig {
             patience: early_stopping_config.patience,
             window_size: early_stopping_config.window_size,
             min_steps: early_stopping_config.min_steps,
-            values: VecDeque::with_capacity(early_stopping_config.window_size),
-            best_value: None,
-            counter: 0,
-            steps_counter: 0,
             reward_threshold: early_stopping_config.reward_threshold,
             target_evaluation_index: early_stopping_config.target_evaluation_index,
         }
     }
+}
 
+pub struct EarlyStoppingMonitor {
+    /// 値を保持するスライディングウィンドウ
+    values: VecDeque<f32>,
+    /// これまでの最良値（最小の損失値）
+    best_value: Option<f32>,
+    /// 改善が見られていない連続ステップ数
+    counter: usize,
+    /// 合計ステップ数
+    steps_counter: usize,
+    /// EarlyStoppingMonitorの設定
+    config: EarlyStoppingMonitorConfig,
+}
+
+impl EarlyStoppingMonitor {
+    /// 新しいEarlyStoppingMonitorを作成
+    ///
+    /// # 引数
+    /// * `values` - 監視する損失値の配列
+    /// * `best_value` - これまでの最良値（最小の損失値）
+    /// * `counter` - 改善が見られていない連続ステップ数
+    /// * `steps_counter` - 合計ステップ数
+    /// * `config` - EarlyStoppingMonitorの設定
+    pub fn new(config: EarlyStoppingMonitorConfig) -> Self {
+        Self {
+            values: VecDeque::with_capacity(config.window_size),
+            best_value: None,
+            counter: 0,
+            steps_counter: 0,
+            config,
+        }
+    }
     /// 値の配列から中央値を計算
     fn calculate_median(values: &[f32]) -> f32 {
         let mut sorted_values = values.to_vec();
@@ -178,17 +198,17 @@ impl EarlyStoppingMonitorConfig {
 
         // スライディングウィンドウに新しい値を追加
         self.values.push_back(value);
-        if self.values.len() > self.window_size {
+        if self.values.len() > self.config.window_size {
             self.values.pop_front();
         }
 
         // 最小ステップ数に達していない場合は継続
-        if self.steps_counter < self.min_steps {
+        if self.steps_counter < self.config.min_steps {
             return false;
         }
 
         // ウィンドウサイズ分のデータが集まっていない場合は継続
-        if self.values.len() < self.window_size {
+        if self.values.len() < self.config.window_size {
             return false;
         }
 
@@ -211,7 +231,7 @@ impl EarlyStoppingMonitorConfig {
 
         // 改善が見られない状態が続いている場合、停止を推奨
         // 次のStepで停止するため、counter + 1 が patience に達した場合に停止する
-        self.counter + 1 >= self.patience
+        self.counter + 1 >= self.config.patience
     }
 
     /// これまでの最良値（最小の損失値）を取得

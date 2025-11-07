@@ -1,6 +1,7 @@
 use crate::{
-    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitorConfig,
-    AsyncTrainStat, AsyncTrainerConfig, ExitReason, PushedItemMessage, SyncModel,
+    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitor,
+    util::EarlyStoppingMonitorConfig, AsyncTrainStat, AsyncTrainerConfig, ExitReason,
+    PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
@@ -339,8 +340,7 @@ where
         // self.run_replay_buffer_thread(buffer.clone());
 
         // Early Stoppingモニターの初期化
-        let mut early_stopping =
-            EarlyStoppingMonitorConfig::new(self.early_stopping_config.clone());
+        let mut early_stopping = EarlyStoppingMonitor::new(self.early_stopping_config.clone());
 
         let mut max_eval_reward = f32::MIN;
         let mut opt_steps = 0;
