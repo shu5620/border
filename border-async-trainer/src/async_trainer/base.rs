@@ -1,7 +1,8 @@
 use crate::{
-    async_trainer::dynamic::DynamicRewardEvaluator, util::EarlyStoppingMonitor,
-    util::EarlyStoppingMonitorConfig, AsyncTrainStat, AsyncTrainerConfig, ExitReason,
-    PushedItemMessage, SyncModel,
+    async_trainer::dynamic::{RichEvalEvaluator, RichEvalSnapshot},
+    util::EarlyStoppingMonitor,
+    util::EarlyStoppingMonitorConfig,
+    AsyncTrainStat, AsyncTrainerConfig, ExitReason, PushedItemMessage, SyncModel,
 };
 use anyhow::Result;
 use border_core::{
@@ -118,11 +119,11 @@ where
     /// Configuration of replay buffer.
     replay_buffer_config: R::Config,
 
-    /// Optional evaluator for dynamic-reward-based early stopping.
-    dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
+    /// Optional evaluator for rich-metric-based early stopping.
+    rich_eval_evaluator: Option<Box<dyn RichEvalEvaluator<A, E>>>,
 
-    /// Baseline dynamic reward captured at the first evaluation.
-    dynamic_reward_baseline: Option<f32>,
+    /// Baseline reward captured at the first rich evaluation.
+    rich_eval_baseline: Option<f32>,
 
     phantom: PhantomData<(A, E, R)>,
 }
@@ -144,7 +145,7 @@ where
         r_bulk_pushed_item: Receiver<PushedItemMessage<R::PushedItem>>,
         model_info_sender: Sender<(usize, A::ModelInfo)>,
         stop: Arc<Mutex<bool>>,
-        dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
+        rich_eval_evaluator: Option<Box<dyn RichEvalEvaluator<A, E>>>,
     ) -> Self {
         Self {
             model_dir: config.model_dir.clone(),
@@ -164,8 +165,8 @@ where
             r_bulk_pushed_item,
             model_info_sender,
             stop,
-            dynamic_reward_evaluator,
-            dynamic_reward_baseline: None,
+            rich_eval_evaluator,
+            rich_eval_baseline: None,
             phantom: PhantomData,
         }
     }
@@ -216,17 +217,95 @@ where
         max_eval_reward: &mut f32,
     ) -> f32 {
         let eval_reward = self.evaluate(agent, env, record).unwrap();
-        record.insert("eval_reward", Scalar(eval_reward));
+        self.handle_eval_reward(eval_reward, agent, record, max_eval_reward);
+        eval_reward
+    }
+
+    /// Inserts evaluation reward into the record and updates the best model if necessary.
+    #[inline]
+    fn handle_eval_reward(
+        &mut self,
+        reward: f32,
+        agent: &mut A,
+        record: &mut Record,
+        max_eval_reward: &mut f32,
+    ) {
+        record.insert("eval_reward", Scalar(reward));
 
         // Save the best model up to the current iteration
-        if self.save_best_model {
-            if eval_reward > *max_eval_reward {
-                *max_eval_reward = eval_reward;
-                self.save_model(agent);
-                info!("Saved the best model");
+        if self.save_best_model && reward > *max_eval_reward {
+            *max_eval_reward = reward;
+            self.save_model(agent);
+            info!("Saved the best model");
+        }
+    }
+
+    #[inline]
+    fn eval_with_rich_metrics(
+        &mut self,
+        evaluator: &dyn RichEvalEvaluator<A, E>,
+        agent: &mut A,
+        env: &mut E,
+        record: &mut Record,
+        max_eval_reward: &mut f32,
+    ) -> Option<(f32, bool)> {
+        let reward = self.evaluate(agent, env, record).unwrap();
+        self.handle_eval_reward(reward, agent, record, max_eval_reward);
+
+        match evaluator.evaluate(agent, env) {
+            Ok(snapshot) => {
+                let RichEvalSnapshot {
+                    reward: snapshot_reward,
+                    metrics,
+                } = snapshot;
+
+                for (metric_id, value) in metrics.iter() {
+                    record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(*value));
+                }
+
+                if reward.is_finite() {
+                    if self.rich_eval_baseline.is_none() {
+                        self.rich_eval_baseline = Some(reward);
+                        record.insert("eval_reward_baseline", Scalar(reward));
+                        info!("Captured baseline rich evaluation reward: {:.4}", reward);
+                    } else if let Some(baseline) = self.rich_eval_baseline {
+                        record.insert("eval_reward_baseline", Scalar(baseline));
+                        let reward_ok = reward >= baseline;
+                        let metrics_map: HashMap<u32, f32> = metrics.iter().copied().collect();
+                        let metrics_ok = self
+                            .early_stopping_config
+                            .target_evaluation_index
+                            .iter()
+                            .all(|(id, threshold)| {
+                                metrics_map
+                                    .get(id)
+                                    .map(|value| *value >= *threshold)
+                                    .unwrap_or(false)
+                            });
+
+                        if reward_ok && metrics_ok {
+                            info!("Early stopping condition satisfied by rich evaluation");
+                            return Some((reward, true));
+                        }
+                    }
+                } else {
+                    warn!("Rich evaluation returned non-finite reward; skipping early stop");
+                }
+
+                if snapshot_reward.is_finite() && (snapshot_reward - reward).abs() > f32::EPSILON {
+                    warn!(
+                        "Rich evaluator reported reward {:.4} differing from recorded eval reward {:.4}",
+                        snapshot_reward, reward
+                    );
+                }
+
+                Some((reward, false))
+            }
+            Err(err) => {
+                warn!("Failed to evaluate rich early stopping metrics: {}", err);
+                Some((reward, false))
             }
         }
-        eval_reward
     }
 
     /// Record.
@@ -391,76 +470,38 @@ where
 
                 if do_eval {
                     info!("Starts evaluation of the trained model");
-                    let eval_reward =
-                        self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward);
                     let mut stop_reason: Option<&str> = None;
+                    let eval_reward = if self.rich_eval_evaluator.is_some() {
+                        let evaluator_opt = self.rich_eval_evaluator.take();
+                        let eval_output = evaluator_opt.as_ref().and_then(|evaluator| {
+                            self.eval_with_rich_metrics(
+                                evaluator.as_ref(),
+                                &mut agent,
+                                &mut env,
+                                &mut record,
+                                &mut max_eval_reward,
+                            )
+                        });
+                        self.rich_eval_evaluator = evaluator_opt;
 
-                    // 動的報酬を用いた早期終了が有効なら、評価結果を取得して閾値判定を行う
-                    if let Some(evaluator) = self.dynamic_reward_evaluator.as_mut() {
-                        match evaluator.evaluate(&mut agent, &mut env) {
-                            Ok(snapshot) => {
-                                record.insert("dynamic_eval_reward", Scalar(snapshot.reward));
-
-                                for (metric_id, value) in snapshot.metrics.iter() {
-                                    record.insert(
-                                        format!("dynamic_eval_metric_{metric_id}"),
-                                        Scalar(*value),
-                                    );
+                        match eval_output {
+                            Some((reward, should_stop)) => {
+                                if should_stop {
+                                    stop_reason = Some("rich_eval");
                                 }
-
-                                // 基準値の記録および指標チェックは有限な報酬が得られた場合のみ行う
-                                if snapshot.reward.is_finite() {
-                                    if self.dynamic_reward_baseline.is_none() {
-                                        self.dynamic_reward_baseline = Some(snapshot.reward);
-                                        record.insert(
-                                            "dynamic_eval_reward_baseline",
-                                            Scalar(snapshot.reward),
-                                        );
-                                        info!(
-                                            "Captured baseline dynamic reward: {:.4}",
-                                            snapshot.reward
-                                        );
-                                    } else if let Some(baseline) = self.dynamic_reward_baseline {
-                                        record.insert(
-                                            "dynamic_eval_reward_baseline",
-                                            Scalar(baseline),
-                                        );
-
-                                        let reward_ok = snapshot.reward >= baseline;
-                                        let metrics_map: HashMap<u32, f32> = snapshot.metrics_map();
-                                        let metrics_ok = self
-                                            .early_stopping_config
-                                            .target_evaluation_index
-                                            .iter()
-                                            .all(|(id, threshold)| {
-                                                metrics_map
-                                                    .get(id)
-                                                    .map(|value| *value >= *threshold)
-                                                    .unwrap_or(false)
-                                            });
-
-                                        if reward_ok && metrics_ok {
-                                            stop_reason = Some("dynamic_reward");
-                                            info!(
-                                                "Early stopping condition satisfied by dynamic reward"
-                                            );
-                                        }
-                                    }
-                                } else {
-                                    warn!(
-                                        "Dynamic reward evaluator returned non-finite reward; skipping early stop"
-                                    );
-                                }
+                                reward
                             }
-                            Err(err) => {
-                                warn!("Failed to evaluate dynamic early stopping metrics: {}", err);
+                            None => {
+                                self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward)
                             }
                         }
-                    }
+                    } else {
+                        self.eval(&mut agent, &mut env, &mut record, &mut max_eval_reward)
+                    };
 
-                    // 動的判定で終了しなかった場合は、従来の報酬閾値による判定を実行
+                    // リッチ評価で終了しなかった場合は、従来の報酬閾値による判定を実行
                     if stop_reason.is_none()
-                        && (self.dynamic_reward_evaluator.is_none()
+                        && (self.rich_eval_evaluator.is_none()
                             || self
                                 .early_stopping_config
                                 .target_evaluation_index

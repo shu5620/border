@@ -29,8 +29,8 @@ pub mod util;
 pub use actor::{actor_stats_fmt, Actor, ActorStat};
 pub use actor_manager::{ActorManager, ActorManagerConfig};
 pub use async_trainer::{
-    AsyncTrainStat, AsyncTrainer, AsyncTrainerConfig, DynamicRewardEvaluator,
-    DynamicRewardSnapshot, ExitReason,
+    AsyncTrainStat, AsyncTrainer, AsyncTrainerConfig, ExitReason, RichEvalEvaluator,
+    RichEvalSnapshot,
 };
 pub use error::BorderAsyncTrainerError;
 pub use messages::PushedItemMessage;

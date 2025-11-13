@@ -1,7 +1,7 @@
 //! Utility function.
 use crate::{
     actor_stats_fmt, ActorManager, ActorManagerConfig, AsyncTrainer, AsyncTrainerConfig,
-    DynamicRewardEvaluator, ExitReason, SyncModel,
+    ExitReason, RichEvalEvaluator, SyncModel,
 };
 use border_core::{record::TensorboardRecorder, Agent, Env, ReplayBufferBase, StepProcessorBase};
 use crossbeam_channel::{bounded, unbounded};
@@ -31,7 +31,7 @@ use std::{
 /// * `replay_buffer_config` - Configuration of the replay buffer.
 /// * `actor_man_config` - Configuration of [`ActorManager`].
 /// * `async_trainer_config` - Configuration of [`AsyncTrainer`].
-/// * `dynamic_reward_evaluator` - Optional evaluator to enable dynamic-reward based
+/// * `rich_eval_evaluator` - Optional evaluator to enable rich-metric based
 ///   early stopping checks during evaluation.
 pub fn train_async<A, E, R, S, P>(
     model_dir: &P,
@@ -43,7 +43,7 @@ pub fn train_async<A, E, R, S, P>(
     replay_buffer_config: &R::Config,
     actor_man_config: &ActorManagerConfig,
     async_trainer_config: &AsyncTrainerConfig,
-    dynamic_reward_evaluator: Option<Box<dyn DynamicRewardEvaluator<A, E>>>,
+    rich_eval_evaluator: Option<Box<dyn RichEvalEvaluator<A, E>>>,
 ) -> ExitReason
 where
     A: Agent<E, R> + SyncModel,
@@ -88,7 +88,7 @@ where
         item_r,
         model_s,
         stop.clone(),
-        dynamic_reward_evaluator,
+        rich_eval_evaluator,
     );
 
     // Starts sampling and training
