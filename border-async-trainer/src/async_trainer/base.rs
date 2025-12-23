@@ -234,12 +234,23 @@ where
         let mut snapshots = Vec::new();
 
         for ix in 0..self.eval_episodes {
-            let (mut episode_reward, snapshot) =
+            let (env_episode_reward, snapshot) =
                 self.run_single_eval_episode(agent, env, record, ix, evaluator)?;
+
+            record.insert(
+                format!("eval_reward_env_episode_{ix}"),
+                Scalar(env_episode_reward),
+            );
+
+            let mut episode_reward = env_episode_reward;
 
             if let (Some(_), Some(ev)) = (evaluator, snapshot.as_ref()) {
                 // When rich evaluator is available, trust its episode reward
                 episode_reward = ev.reward;
+                record.insert(
+                    format!("eval_reward_rich_episode_{ix}"),
+                    Scalar(episode_reward),
+                );
             }
 
             episode_rewards.push(episode_reward);
@@ -341,6 +352,7 @@ where
         }
 
         // Record per-episode metrics and compute averages
+        let snapshots_count = snapshots.len() as f32;
         let mut metric_sums: HashMap<u32, f32> = HashMap::new();
 
         for (ix, snapshot) in snapshots.iter().enumerate() {
@@ -357,7 +369,7 @@ where
         }
 
         for (metric_id, sum_value) in metric_sums.iter() {
-            let avg_value = *sum_value / episodes_count;
+            let avg_value = *sum_value / snapshots_count;
             record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(avg_value));
         }
 
@@ -377,7 +389,7 @@ where
                 let reward_ok = reward_avg >= baseline;
                 let metrics_map: HashMap<u32, f32> = metric_sums
                     .iter()
-                    .map(|(id, sum)| (*id, *sum / episodes_count))
+                    .map(|(id, sum)| (*id, *sum / snapshots_count))
                     .collect();
                 let target_metrics = &self.early_stopping_config.target_evaluation_index;
                 let metrics_ok = !target_metrics.is_empty()
