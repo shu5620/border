@@ -323,7 +323,16 @@ where
             return Some((0.0, false));
         }
 
-        let reward_avg = episode_rewards.iter().sum::<f32>() / episode_rewards.len() as f32;
+        if snapshots.len() != episode_rewards.len() {
+            warn!(
+                "Rich evaluator snapshots missing for some episodes: {} snapshots for {} episodes",
+                snapshots.len(),
+                episode_rewards.len()
+            );
+        }
+
+        let episodes_count = episode_rewards.len() as f32;
+        let reward_avg = episode_rewards.iter().sum::<f32>() / episodes_count;
         self.handle_eval_reward(reward_avg, agent, record, max_eval_reward);
 
         if snapshots.is_empty() {
@@ -332,7 +341,6 @@ where
         }
 
         // Record per-episode metrics and compute averages
-        let episodes_count = snapshots.len() as f32;
         let mut metric_sums: HashMap<u32, f32> = HashMap::new();
 
         for (ix, snapshot) in snapshots.iter().enumerate() {
@@ -353,15 +361,8 @@ where
             record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(avg_value));
         }
 
-        let evaluator_reward_avg = snapshots.iter().map(|s| s.reward).sum::<f32>() / episodes_count;
-        record.insert("rich_eval_reward", Scalar(evaluator_reward_avg));
-
-        if (evaluator_reward_avg - reward_avg).abs() > f32::EPSILON {
-            warn!(
-                "Evaluator reward avg {:.4} differs from env reward avg {:.4}",
-                evaluator_reward_avg, reward_avg
-            );
-        }
+        // Mirror the averaged evaluation reward
+        record.insert("rich_eval_reward", Scalar(reward_avg));
 
         if reward_avg.is_finite() {
             if self.rich_eval_baseline.is_none() {
