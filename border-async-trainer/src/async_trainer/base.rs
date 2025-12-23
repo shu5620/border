@@ -192,6 +192,7 @@ where
 
         let mut episode_reward = 0f32;
         let mut last_snapshot: Option<RichEvalSnapshot> = None;
+        let mut step_ix = 0usize;
 
         loop {
             let act = agent.sample(&prev_obs);
@@ -204,7 +205,7 @@ where
                     Ok(snapshot) => last_snapshot = Some(snapshot),
                     Err(err) => warn!(
                         "Failed to evaluate rich metrics on step {} of episode {}: {}",
-                        self.eval_episodes, ix, err
+                        step_ix, ix, err
                     ),
                 }
             }
@@ -213,6 +214,7 @@ where
                 break;
             }
             prev_obs = step.obs;
+            step_ix += 1;
         }
 
         Ok((episode_reward, last_snapshot))
@@ -232,8 +234,14 @@ where
         let mut snapshots = Vec::new();
 
         for ix in 0..self.eval_episodes {
-            let (episode_reward, snapshot) =
+            let (mut episode_reward, snapshot) =
                 self.run_single_eval_episode(agent, env, record, ix, evaluator)?;
+
+            if let (Some(_), Some(ev)) = (evaluator, snapshot.as_ref()) {
+                // When rich evaluator is available, trust its episode reward
+                episode_reward = ev.reward;
+            }
+
             episode_rewards.push(episode_reward);
             record.insert(format!("eval_reward_episode_{ix}"), Scalar(episode_reward));
 
