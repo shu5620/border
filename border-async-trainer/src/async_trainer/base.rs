@@ -185,24 +185,37 @@ where
         env: &mut E,
         record: &mut Record,
         ix: usize,
-    ) -> Result<f32> {
+        evaluator: Option<&dyn RichEvalEvaluator<A, E>>,
+    ) -> Result<(f32, Option<RichEvalSnapshot>)> {
         let mut prev_obs = env.reset_with_index(ix)?;
         assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
 
         let mut episode_reward = 0f32;
+        let mut last_snapshot: Option<RichEvalSnapshot> = None;
 
         loop {
             let act = agent.sample(&prev_obs);
             let (step, record_) = env.step(&act);
             record.extend(record_);
             episode_reward += step.reward[0];
+
+            if let Some(ev) = evaluator {
+                match ev.evaluate(agent, env) {
+                    Ok(snapshot) => last_snapshot = Some(snapshot),
+                    Err(err) => warn!(
+                        "Failed to evaluate rich metrics on step {} of episode {}: {}",
+                        self.eval_episodes, ix, err
+                    ),
+                }
+            }
+
             if step.is_done[0] == 1 {
                 break;
             }
             prev_obs = step.obs;
         }
 
-        Ok(episode_reward)
+        Ok((episode_reward, last_snapshot))
     }
 
     fn run_eval_episodes(
@@ -219,15 +232,13 @@ where
         let mut snapshots = Vec::new();
 
         for ix in 0..self.eval_episodes {
-            let episode_reward = self.run_single_eval_episode(agent, env, record, ix)?;
+            let (episode_reward, snapshot) =
+                self.run_single_eval_episode(agent, env, record, ix, evaluator)?;
             episode_rewards.push(episode_reward);
             record.insert(format!("eval_reward_episode_{ix}"), Scalar(episode_reward));
 
-            if let Some(evaluator) = evaluator {
-                match evaluator.evaluate(agent, env) {
-                    Ok(snapshot) => snapshots.push(snapshot),
-                    Err(err) => warn!("Failed to evaluate rich metrics on episode {ix}: {}", err),
-                }
+            if let Some(snapshot) = snapshot {
+                snapshots.push(snapshot);
             }
         }
 
@@ -239,7 +250,13 @@ where
 
     fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
         self.run_eval_episodes(agent, env, record, None)
-            .map(|(rewards, _)| *rewards.last().unwrap_or(&0.0))
+            .map(|(rewards, _)| {
+                if rewards.is_empty() {
+                    0.0
+                } else {
+                    rewards.iter().sum::<f32>() / rewards.len() as f32
+                }
+            })
     }
 
     /// Do evaluation.
@@ -293,17 +310,22 @@ where
                 }
             };
 
-        // Use the last episode's reward for early-stopping decisions
-        let reward = *episode_rewards.last().unwrap_or(&0.0);
-        self.handle_eval_reward(reward, agent, record, max_eval_reward);
+        if episode_rewards.is_empty() {
+            warn!("No evaluation episodes were run; skipping rich metrics");
+            return Some((0.0, false));
+        }
+
+        let reward_avg = episode_rewards.iter().sum::<f32>() / episode_rewards.len() as f32;
+        self.handle_eval_reward(reward_avg, agent, record, max_eval_reward);
 
         if snapshots.is_empty() {
             warn!("Rich evaluation snapshots were empty; skipping metric aggregation");
-            return Some((reward, false));
+            return Some((reward_avg, false));
         }
 
-        // Use only the last episode's snapshot for recording/early-stopping
-        let last_snapshot = snapshots.last().unwrap();
+        // Record per-episode metrics and compute averages
+        let episodes_count = snapshots.len() as f32;
+        let mut metric_sums: HashMap<u32, f32> = HashMap::new();
 
         for (ix, snapshot) in snapshots.iter().enumerate() {
             for (metric_id, value) in snapshot.metrics.iter().copied() {
@@ -311,25 +333,43 @@ where
                     format!("rich_eval_metric_{metric_id}_episode_{ix}"),
                     Scalar(value),
                 );
+                metric_sums
+                    .entry(metric_id)
+                    .and_modify(|acc| *acc += value)
+                    .or_insert(value);
             }
         }
 
-        for (metric_id, value) in last_snapshot.metrics.iter().copied() {
-            record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(value));
+        for (metric_id, sum_value) in metric_sums.iter() {
+            let avg_value = *sum_value / episodes_count;
+            record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(avg_value));
         }
 
-        let snapshot_reward_total = last_snapshot.reward;
+        let evaluator_reward_avg = snapshots.iter().map(|s| s.reward).sum::<f32>() / episodes_count;
+        record.insert("rich_eval_reward", Scalar(evaluator_reward_avg));
 
-        if reward.is_finite() {
+        if (evaluator_reward_avg - reward_avg).abs() > f32::EPSILON {
+            warn!(
+                "Evaluator reward avg {:.4} differs from env reward avg {:.4}",
+                evaluator_reward_avg, reward_avg
+            );
+        }
+
+        if reward_avg.is_finite() {
             if self.rich_eval_baseline.is_none() {
-                self.rich_eval_baseline = Some(reward);
-                record.insert("eval_reward_baseline", Scalar(reward));
-                info!("Captured baseline rich evaluation reward: {:.4}", reward);
+                self.rich_eval_baseline = Some(reward_avg);
+                record.insert("eval_reward_baseline", Scalar(reward_avg));
+                info!(
+                    "Captured baseline rich evaluation reward: {:.4}",
+                    reward_avg
+                );
             } else if let Some(baseline) = self.rich_eval_baseline {
                 record.insert("eval_reward_baseline", Scalar(baseline));
-                let reward_ok = reward >= baseline;
-                let metrics_map: HashMap<u32, f32> =
-                    last_snapshot.metrics.iter().copied().collect();
+                let reward_ok = reward_avg >= baseline;
+                let metrics_map: HashMap<u32, f32> = metric_sums
+                    .iter()
+                    .map(|(id, sum)| (*id, *sum / episodes_count))
+                    .collect();
                 let target_metrics = &self.early_stopping_config.target_evaluation_index;
                 let metrics_ok = !target_metrics.is_empty()
                     && target_metrics.iter().all(|(id, threshold)| {
@@ -341,23 +381,14 @@ where
 
                 if reward_ok && metrics_ok {
                     info!("Early stopping condition satisfied by rich evaluation");
-                    return Some((reward, true));
+                    return Some((reward_avg, true));
                 }
             }
         } else {
             warn!("Rich evaluation returned non-finite reward; skipping early stop");
         }
 
-        if snapshot_reward_total.is_finite()
-            && (snapshot_reward_total - reward).abs() > f32::EPSILON
-        {
-            warn!(
-                "Rich evaluator reported total reward {:.4} differing from recorded eval reward {:.4}",
-                snapshot_reward_total, reward
-            );
-        }
-
-        Some((reward, false))
+        Some((reward_avg, false))
     }
 
     /// Record.
@@ -955,14 +986,33 @@ mod tests {
             .unwrap();
         trainer.rich_eval_evaluator = Some(evaluator_ref);
 
-        // Reward uses the last episode only: second episode total is 0.5
-        assert!((result.0 - 0.5).abs() < 1e-6);
+        // Reward uses the average across episodes: (3.0 + 0.5) / 2 = 1.75
+        assert!((result.0 - 1.75).abs() < 1e-6);
 
-        // Metric also uses the last episode only: second episode total is 7.0
+        // Average metric across episodes: (30.0 + 7.0) / 2 = 18.5
         let metric_value = match record.get("rich_eval_metric_1").unwrap() {
             Scalar(v) => *v,
             _ => panic!("Unexpected record value"),
         };
-        assert!((metric_value - 7.0).abs() < 1e-6);
+        assert!((metric_value - 18.5).abs() < 1e-6);
+
+        // Per-episode metric totals are also recorded
+        let metric_ep0 = match record.get("rich_eval_metric_1_episode_0").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        let metric_ep1 = match record.get("rich_eval_metric_1_episode_1").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        assert!((metric_ep0 - 30.0).abs() < 1e-6);
+        assert!((metric_ep1 - 7.0).abs() < 1e-6);
+
+        // Evaluator reward average is also recorded and matches env average
+        let eval_reward = match record.get("rich_eval_reward").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        assert!((eval_reward - 1.75).abs() < 1e-6);
     }
 }
