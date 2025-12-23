@@ -330,11 +330,9 @@ where
                 let reward_ok = reward >= baseline;
                 let metrics_map: HashMap<u32, f32> =
                     last_snapshot.metrics.iter().copied().collect();
-                let metrics_ok = self
-                    .early_stopping_config
-                    .target_evaluation_index
-                    .iter()
-                    .all(|(id, threshold)| {
+                let target_metrics = &self.early_stopping_config.target_evaluation_index;
+                let metrics_ok = !target_metrics.is_empty()
+                    && target_metrics.iter().all(|(id, threshold)| {
                         metrics_map
                             .get(id)
                             .map(|value| *value >= *threshold)
