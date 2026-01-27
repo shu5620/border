@@ -187,12 +187,32 @@ where
         ix: usize,
         evaluator: Option<&dyn RichEvalEvaluator<A, E>>,
     ) -> Result<(f32, Option<RichEvalSnapshot>)> {
+        if std::env::var("DEBUG_RICH_EVAL").is_ok() {
+            eprintln!("[DEBUG_RICH_EVAL] run_single_eval_episode START: episode {}", ix);
+        }
+
         let mut prev_obs = env.reset_with_index(ix)?;
         assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
 
         let mut episode_reward = 0f32;
-        let mut last_snapshot: Option<RichEvalSnapshot> = None;
         let mut step_ix = 0usize;
+
+        // For cumulative metrics tracking
+        let mut prev_snapshot: Option<RichEvalSnapshot> = None;
+        let mut cumulative_snapshot: Option<RichEvalSnapshot> = None;
+
+        // Get initial snapshot after reset (before any action)
+        if let Some(ev) = evaluator {
+            match ev.evaluate(agent, env) {
+                Ok(snapshot) => {
+                    prev_snapshot = Some(snapshot);
+                }
+                Err(err) => warn!(
+                    "Failed to get initial rich metrics for episode {}: {}",
+                    ix, err
+                ),
+            }
+        }
 
         loop {
             let act = agent.sample(&prev_obs);
@@ -202,7 +222,24 @@ where
 
             if let Some(ev) = evaluator {
                 match ev.evaluate(agent, env) {
-                    Ok(snapshot) => last_snapshot = Some(snapshot),
+                    Ok(current_snapshot) => {
+                        // Compute delta from previous snapshot and accumulate
+                        if let Some(ref prev) = prev_snapshot {
+                            let delta = current_snapshot.delta_from(prev);
+
+                            match cumulative_snapshot.as_mut() {
+                                Some(cumul) => cumul.accumulate(&delta),
+                                None => {
+                                    cumulative_snapshot = Some(delta);
+                                }
+                            }
+                        } else {
+                            // No previous snapshot, use current as initial cumulative
+                            cumulative_snapshot = Some(current_snapshot.clone());
+                        }
+
+                        prev_snapshot = Some(current_snapshot);
+                    }
                     Err(err) => warn!(
                         "Failed to evaluate rich metrics on step {} of episode {}: {}",
                         step_ix, ix, err
@@ -217,7 +254,23 @@ where
             step_ix += 1;
         }
 
-        Ok((episode_reward, last_snapshot))
+        // Debug log for cumulative snapshot at episode end
+        if std::env::var("DEBUG_RICH_EVAL").is_ok() {
+            eprintln!("[DEBUG_RICH_EVAL] === Episode {} End ===", ix);
+            eprintln!("[DEBUG_RICH_EVAL] total steps: {}", step_ix + 1);
+            eprintln!("[DEBUG_RICH_EVAL] env episode_reward (step rewards sum): {:.6}", episode_reward);
+            eprintln!("[DEBUG_RICH_EVAL] cumulative_snapshot is_some: {}", cumulative_snapshot.is_some());
+            if let Some(ref cumul) = cumulative_snapshot {
+                eprintln!("[DEBUG_RICH_EVAL] cumulative reward: {:.6}", cumul.reward);
+                eprintln!("[DEBUG_RICH_EVAL] cumulative metrics:");
+                for (metric_id, value) in &cumul.metrics {
+                    eprintln!("[DEBUG_RICH_EVAL]   metric_{}: {:.6}", metric_id, value);
+                }
+            }
+            eprintln!("[DEBUG_RICH_EVAL] ========================================");
+        }
+
+        Ok((episode_reward, cumulative_snapshot))
     }
 
     fn run_eval_episodes(
