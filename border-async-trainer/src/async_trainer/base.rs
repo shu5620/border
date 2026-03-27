@@ -179,32 +179,156 @@ where
         }
     }
 
-    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
+    fn run_single_eval_episode(
+        &mut self,
+        agent: &mut A,
+        env: &mut E,
+        record: &mut Record,
+        ix: usize,
+        evaluator: Option<&dyn RichEvalEvaluator<A, E>>,
+    ) -> Result<(f32, Option<RichEvalSnapshot>)> {
+        if std::env::var("DEBUG_RICH_EVAL").is_ok() {
+            eprintln!("[DEBUG_RICH_EVAL] run_single_eval_episode START: episode {}", ix);
+        }
+
+        let mut prev_obs = env.reset_with_index(ix)?;
+        assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
+
+        let mut episode_reward = 0f32;
+        let mut step_ix = 0usize;
+
+        // For cumulative metrics tracking
+        let mut prev_snapshot: Option<RichEvalSnapshot> = None;
+        let mut cumulative_snapshot: Option<RichEvalSnapshot> = None;
+
+        // Get initial snapshot after reset (before any action)
+        if let Some(ev) = evaluator {
+            match ev.evaluate(agent, env) {
+                Ok(snapshot) => {
+                    prev_snapshot = Some(snapshot);
+                }
+                Err(err) => warn!(
+                    "Failed to get initial rich metrics for episode {}: {}",
+                    ix, err
+                ),
+            }
+        }
+
+        loop {
+            let act = agent.sample(&prev_obs);
+            let (step, record_) = env.step(&act);
+            record.extend(record_);
+            episode_reward += step.reward[0];
+
+            if let Some(ev) = evaluator {
+                match ev.evaluate(agent, env) {
+                    Ok(current_snapshot) => {
+                        // Compute delta from previous snapshot and accumulate
+                        if let Some(ref prev) = prev_snapshot {
+                            let delta = current_snapshot.delta_from(prev);
+
+                            match cumulative_snapshot.as_mut() {
+                                Some(cumul) => cumul.accumulate(&delta),
+                                None => {
+                                    cumulative_snapshot = Some(delta);
+                                }
+                            }
+                        } else {
+                            // No previous snapshot, use current as initial cumulative
+                            cumulative_snapshot = Some(current_snapshot.clone());
+                        }
+
+                        prev_snapshot = Some(current_snapshot);
+                    }
+                    Err(err) => warn!(
+                        "Failed to evaluate rich metrics on step {} of episode {}: {}",
+                        step_ix, ix, err
+                    ),
+                }
+            }
+
+            if step.is_done[0] == 1 {
+                break;
+            }
+            prev_obs = step.obs;
+            step_ix += 1;
+        }
+
+        // Debug log for cumulative snapshot at episode end
+        if std::env::var("DEBUG_RICH_EVAL").is_ok() {
+            eprintln!("[DEBUG_RICH_EVAL] === Episode {} End ===", ix);
+            eprintln!("[DEBUG_RICH_EVAL] total steps: {}", step_ix + 1);
+            eprintln!("[DEBUG_RICH_EVAL] env episode_reward (step rewards sum): {:.6}", episode_reward);
+            eprintln!("[DEBUG_RICH_EVAL] cumulative_snapshot is_some: {}", cumulative_snapshot.is_some());
+            if let Some(ref cumul) = cumulative_snapshot {
+                eprintln!("[DEBUG_RICH_EVAL] cumulative reward: {:.6}", cumul.reward);
+                eprintln!("[DEBUG_RICH_EVAL] cumulative metrics:");
+                for (metric_id, value) in &cumul.metrics {
+                    eprintln!("[DEBUG_RICH_EVAL]   metric_{}: {:.6}", metric_id, value);
+                }
+            }
+            eprintln!("[DEBUG_RICH_EVAL] ========================================");
+        }
+
+        Ok((episode_reward, cumulative_snapshot))
+    }
+
+    fn run_eval_episodes(
+        &mut self,
+        agent: &mut A,
+        env: &mut E,
+        record: &mut Record,
+        evaluator: Option<&dyn RichEvalEvaluator<A, E>>,
+    ) -> Result<(Vec<f32>, Vec<RichEvalSnapshot>)> {
         agent.eval();
         env.set_eval_mode();
 
-        let mut r_total = 0f32;
+        let mut episode_rewards = Vec::with_capacity(self.eval_episodes);
+        let mut snapshots = Vec::new();
 
         for ix in 0..self.eval_episodes {
-            let mut prev_obs = env.reset_with_index(ix)?;
-            assert_eq!(prev_obs.len(), 1); // env must be non-vectorized
+            let (env_episode_reward, snapshot) =
+                self.run_single_eval_episode(agent, env, record, ix, evaluator)?;
 
-            loop {
-                let act = agent.sample(&prev_obs);
-                let (step, record_) = env.step(&act);
-                record.extend(record_);
-                r_total += step.reward[0];
-                if step.is_done[0] == 1 {
-                    break;
-                }
-                prev_obs = step.obs;
+            record.insert(
+                format!("eval_reward_env_episode_{ix}"),
+                Scalar(env_episode_reward),
+            );
+
+            let mut episode_reward = env_episode_reward;
+
+            if let (Some(_), Some(ev)) = (evaluator, snapshot.as_ref()) {
+                // When rich evaluator is available, trust its episode reward
+                episode_reward = ev.reward;
+                record.insert(
+                    format!("eval_reward_rich_episode_{ix}"),
+                    Scalar(episode_reward),
+                );
+            }
+
+            episode_rewards.push(episode_reward);
+            record.insert(format!("eval_reward_episode_{ix}"), Scalar(episode_reward));
+
+            if let Some(snapshot) = snapshot {
+                snapshots.push(snapshot);
             }
         }
 
         agent.train();
         env.set_train_mode();
 
-        Ok(r_total / self.eval_episodes as f32)
+        Ok((episode_rewards, snapshots))
+    }
+
+    fn evaluate(&mut self, agent: &mut A, env: &mut E, record: &mut Record) -> Result<f32> {
+        self.run_eval_episodes(agent, env, record, None)
+            .map(|(rewards, _)| {
+                if rewards.is_empty() {
+                    0.0
+                } else {
+                    rewards.iter().sum::<f32>() / rewards.len() as f32
+                }
+            })
     }
 
     /// Do evaluation.
@@ -249,63 +373,96 @@ where
         record: &mut Record,
         max_eval_reward: &mut f32,
     ) -> Option<(f32, bool)> {
-        let reward = self.evaluate(agent, env, record).unwrap();
-        self.handle_eval_reward(reward, agent, record, max_eval_reward);
-
-        match evaluator.evaluate(agent, env) {
-            Ok(snapshot) => {
-                let RichEvalSnapshot {
-                    reward: snapshot_reward,
-                    metrics,
-                } = snapshot;
-
-                for (metric_id, value) in metrics.iter() {
-                    record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(*value));
+        let (episode_rewards, snapshots) =
+            match self.run_eval_episodes(agent, env, record, Some(evaluator)) {
+                Ok(result) => result,
+                Err(err) => {
+                    warn!("Failed to evaluate episodes for rich metrics: {}", err);
+                    return Some((0.0, false));
                 }
+            };
 
-                if reward.is_finite() {
-                    if self.rich_eval_baseline.is_none() {
-                        self.rich_eval_baseline = Some(reward);
-                        record.insert("eval_reward_baseline", Scalar(reward));
-                        info!("Captured baseline rich evaluation reward: {:.4}", reward);
-                    } else if let Some(baseline) = self.rich_eval_baseline {
-                        record.insert("eval_reward_baseline", Scalar(baseline));
-                        let reward_ok = reward >= baseline;
-                        let metrics_map: HashMap<u32, f32> = metrics.iter().copied().collect();
-                        let metrics_ok = self
-                            .early_stopping_config
-                            .target_evaluation_index
-                            .iter()
-                            .all(|(id, threshold)| {
-                                metrics_map
-                                    .get(id)
-                                    .map(|value| *value >= *threshold)
-                                    .unwrap_or(false)
-                            });
+        if episode_rewards.is_empty() {
+            warn!("No evaluation episodes were run; skipping rich metrics");
+            return Some((0.0, false));
+        }
 
-                        if reward_ok && metrics_ok {
-                            info!("Early stopping condition satisfied by rich evaluation");
-                            return Some((reward, true));
-                        }
-                    }
-                } else {
-                    warn!("Rich evaluation returned non-finite reward; skipping early stop");
-                }
+        if snapshots.len() != episode_rewards.len() {
+            warn!(
+                "Rich evaluator snapshots missing for some episodes: {} snapshots for {} episodes",
+                snapshots.len(),
+                episode_rewards.len()
+            );
+        }
 
-                if snapshot_reward.is_finite() && (snapshot_reward - reward).abs() > f32::EPSILON {
-                    warn!(
-                        "Rich evaluator reported reward {:.4} differing from recorded eval reward {:.4}",
-                        snapshot_reward, reward
-                    );
-                }
+        let episodes_count = episode_rewards.len() as f32;
+        let reward_avg = episode_rewards.iter().sum::<f32>() / episodes_count;
+        self.handle_eval_reward(reward_avg, agent, record, max_eval_reward);
 
-                Some((reward, false))
-            }
-            Err(err) => {
-                warn!("Failed to evaluate rich early stopping metrics: {}", err);
-                Some((reward, false))
+        if snapshots.is_empty() {
+            warn!("Rich evaluation snapshots were empty; skipping metric aggregation");
+            return Some((reward_avg, false));
+        }
+
+        // Record per-episode metrics and compute averages
+        let snapshots_count = snapshots.len() as f32;
+        let mut metric_sums: HashMap<u32, f32> = HashMap::new();
+
+        for (ix, snapshot) in snapshots.iter().enumerate() {
+            for (metric_id, value) in snapshot.metrics.iter().copied() {
+                record.insert(
+                    format!("rich_eval_metric_{metric_id}_episode_{ix}"),
+                    Scalar(value),
+                );
+                metric_sums
+                    .entry(metric_id)
+                    .and_modify(|acc| *acc += value)
+                    .or_insert(value);
             }
         }
+
+        for (metric_id, sum_value) in metric_sums.iter() {
+            let avg_value = *sum_value / snapshots_count;
+            record.insert(format!("rich_eval_metric_{metric_id}"), Scalar(avg_value));
+        }
+
+        // Mirror the averaged evaluation reward
+        record.insert("rich_eval_reward", Scalar(reward_avg));
+
+        if reward_avg.is_finite() {
+            if self.rich_eval_baseline.is_none() {
+                self.rich_eval_baseline = Some(reward_avg);
+                record.insert("eval_reward_baseline", Scalar(reward_avg));
+                info!(
+                    "Captured baseline rich evaluation reward: {:.4}",
+                    reward_avg
+                );
+            } else if let Some(baseline) = self.rich_eval_baseline {
+                record.insert("eval_reward_baseline", Scalar(baseline));
+                let reward_ok = reward_avg >= baseline;
+                let metrics_map: HashMap<u32, f32> = metric_sums
+                    .iter()
+                    .map(|(id, sum)| (*id, *sum / snapshots_count))
+                    .collect();
+                let target_metrics = &self.early_stopping_config.target_evaluation_index;
+                let metrics_ok = !target_metrics.is_empty()
+                    && target_metrics.iter().all(|(id, threshold)| {
+                        metrics_map
+                            .get(id)
+                            .map(|value| *value >= *threshold)
+                            .unwrap_or(false)
+                    });
+
+                if reward_ok && metrics_ok {
+                    info!("Early stopping condition satisfied by rich evaluation");
+                    return Some((reward_avg, true));
+                }
+            }
+        } else {
+            warn!("Rich evaluation returned non-finite reward; skipping early stop");
+        }
+
+        Some((reward_avg, false))
     }
 
     /// Record.
@@ -607,5 +764,329 @@ where
             opt_per_sec,
             exit_reason,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use border_core::{
+        record::{Record, RecordValue::Scalar},
+        Act, ExperienceBufferBase, Info, Obs, Policy, Step,
+    };
+    use crossbeam_channel::{bounded, unbounded};
+
+    #[derive(Clone, Debug)]
+    struct DummyObs(i32);
+
+    impl Obs for DummyObs {
+        fn dummy(_n: usize) -> Self {
+            DummyObs(0)
+        }
+
+        fn merge(self, _obs_reset: Self, _is_done: &[i8]) -> Self {
+            self
+        }
+
+        fn len(&self) -> usize {
+            1
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct DummyAct;
+
+    impl Act for DummyAct {
+        fn len(&self) -> usize {
+            1
+        }
+    }
+
+    #[derive(Clone, Debug)]
+    struct DummyInfo;
+
+    impl Info for DummyInfo {}
+
+    #[derive(Clone)]
+    struct DummyEnvConfig {
+        episodes: Vec<Vec<(f32, f32)>>,
+    }
+
+    struct DummyEnv {
+        config: DummyEnvConfig,
+        episode_ix: usize,
+        step_ix: usize,
+        episode_reward: f32,
+        episode_metric: f32,
+    }
+
+    impl DummyEnv {
+        fn reset_state(&mut self, ix: usize) -> DummyObs {
+            self.episode_ix = ix;
+            self.step_ix = 0;
+            self.episode_reward = 0.0;
+            self.episode_metric = 0.0;
+            DummyObs(0)
+        }
+    }
+
+    impl Env for DummyEnv {
+        type Config = DummyEnvConfig;
+        type Obs = DummyObs;
+        type Act = DummyAct;
+        type Info = DummyInfo;
+
+        fn build(config: &Self::Config, _seed: i64) -> Result<Self> {
+            Ok(Self {
+                config: config.clone(),
+                episode_ix: 0,
+                step_ix: 0,
+                episode_reward: 0.0,
+                episode_metric: 0.0,
+            })
+        }
+
+        fn step(&mut self, _a: &Self::Act) -> (Step<Self>, Record) {
+            let episode = &self.config.episodes[self.episode_ix];
+            let (reward, metric) = episode[self.step_ix];
+            self.step_ix += 1;
+            self.episode_reward += reward;
+            self.episode_metric += metric;
+
+            let is_done = if self.step_ix >= episode.len() { 1 } else { 0 };
+            let obs = DummyObs(self.step_ix as i32);
+
+            (
+                Step::new(
+                    obs.clone(),
+                    DummyAct,
+                    vec![reward],
+                    vec![is_done],
+                    DummyInfo,
+                    DummyObs(0),
+                ),
+                Record::empty(),
+            )
+        }
+
+        fn reset(&mut self, is_done: Option<&Vec<i8>>) -> Result<Self::Obs> {
+            if let Some(flags) = is_done {
+                if flags.get(0).copied() == Some(1) {
+                    return Ok(self.reset_state(self.episode_ix));
+                }
+            }
+            Ok(self.reset_state(self.episode_ix))
+        }
+
+        fn step_with_reset(&mut self, a: &Self::Act) -> (Step<Self>, Record) {
+            let (step, record) = self.step(a);
+            if step.is_done[0] == 1 {
+                let _ = self.reset(Some(&step.is_done));
+            }
+            (step, record)
+        }
+
+        fn reset_with_index(&mut self, ix: usize) -> Result<Self::Obs> {
+            Ok(self.reset_state(ix))
+        }
+
+        fn set_train_mode(&mut self) {}
+
+        fn set_eval_mode(&mut self) {}
+    }
+
+    #[derive(Clone)]
+    struct DummyAgentConfig;
+
+    #[derive(Clone)]
+    struct DummyAgent {
+        is_train: bool,
+    }
+
+    impl Policy<DummyEnv> for DummyAgent {
+        type Config = DummyAgentConfig;
+
+        fn build(_config: Self::Config) -> Self {
+            Self { is_train: true }
+        }
+
+        fn sample(&mut self, _obs: &DummyObs) -> DummyAct {
+            DummyAct
+        }
+    }
+
+    impl Agent<DummyEnv, DummyReplayBuffer> for DummyAgent {
+        fn train(&mut self) {
+            self.is_train = true;
+        }
+
+        fn eval(&mut self) {
+            self.is_train = false;
+        }
+
+        fn is_train(&self) -> bool {
+            self.is_train
+        }
+
+        fn opt(&mut self, _buffer: &mut DummyReplayBuffer) -> (Option<Record>, Option<f32>) {
+            (None, None)
+        }
+
+        fn save<T: AsRef<std::path::Path>>(&self, _path: T) -> Result<()> {
+            Ok(())
+        }
+
+        fn load<T: AsRef<std::path::Path>>(&mut self, _path: T) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    impl SyncModel for DummyAgent {
+        type ModelInfo = ();
+
+        fn model_info(&self) -> (usize, Self::ModelInfo) {
+            (0, ())
+        }
+
+        fn sync_model(&mut self, _model_info: &Self::ModelInfo) {}
+    }
+
+    #[derive(Clone)]
+    struct DummyReplayBufferConfig;
+
+    struct DummyReplayBuffer;
+
+    impl ExperienceBufferBase for DummyReplayBuffer {
+        type PushedItem = ();
+
+        fn push(&mut self, _tr: Self::PushedItem) -> Result<()> {
+            Ok(())
+        }
+
+        fn len(&self) -> usize {
+            0
+        }
+    }
+
+    impl ReplayBufferBase for DummyReplayBuffer {
+        type Config = DummyReplayBufferConfig;
+        type Batch = ();
+
+        fn build(_config: &Self::Config) -> Self {
+            DummyReplayBuffer
+        }
+
+        fn batch(&mut self, _size: usize) -> Result<Self::Batch> {
+            Ok(())
+        }
+
+        fn update_priority(&mut self, _ixs: &Option<Vec<usize>>, _td_err: &Option<Vec<f32>>) {}
+    }
+
+    struct DummyEvaluator;
+
+    impl RichEvalEvaluator<DummyAgent, DummyEnv> for DummyEvaluator {
+        fn evaluate(
+            &self,
+            _agent: &mut DummyAgent,
+            env: &mut DummyEnv,
+        ) -> Result<RichEvalSnapshot> {
+            Ok(RichEvalSnapshot {
+                reward: env.episode_reward,
+                metrics: vec![(1, env.episode_metric)],
+            })
+        }
+    }
+
+    #[test]
+    fn rich_eval_aggregates_episode_totals() {
+        let trainer_config = AsyncTrainerConfig {
+            model_dir: None,
+            model_name: "dummy".into(),
+            save_best_model: false,
+            record_interval: 1,
+            eval_interval: 1,
+            max_train_steps: 1,
+            save_interval: 1,
+            sync_interval: 1,
+            eval_episodes: 2,
+            channel_capacity: 1,
+            early_stopping_config: EarlyStoppingMonitorConfig {
+                patience: 1,
+                window_size: 1,
+                min_steps: 0,
+                reward_threshold: f32::MIN,
+                target_evaluation_index: vec![(1, 0.0)],
+            },
+            timeout_minutes: None,
+        };
+
+        let env_config = DummyEnvConfig {
+            episodes: vec![vec![(1.0, 10.0), (2.0, 20.0)], vec![(0.5, 7.0)]],
+        };
+        let agent_config = DummyAgentConfig;
+        let replay_buffer_config = DummyReplayBufferConfig;
+
+        let (_item_s, item_r) = bounded(trainer_config.channel_capacity);
+        let (model_s, _model_r) = unbounded();
+        let stop = Arc::new(Mutex::new(false));
+        let evaluator: Box<dyn RichEvalEvaluator<DummyAgent, DummyEnv>> = Box::new(DummyEvaluator);
+
+        let mut trainer = AsyncTrainer::<DummyAgent, DummyEnv, DummyReplayBuffer>::build(
+            &trainer_config,
+            &agent_config,
+            &env_config,
+            &replay_buffer_config,
+            item_r,
+            model_s,
+            stop,
+            Some(evaluator),
+        );
+
+        let mut agent = DummyAgent::build(agent_config.clone());
+        let mut env = DummyEnv::build(&env_config, 0).unwrap();
+        let mut record = Record::empty();
+        let mut max_eval_reward = f32::MIN;
+
+        let evaluator_ref = trainer.rich_eval_evaluator.take().unwrap();
+        let result = trainer
+            .eval_with_rich_metrics(
+                evaluator_ref.as_ref(),
+                &mut agent,
+                &mut env,
+                &mut record,
+                &mut max_eval_reward,
+            )
+            .unwrap();
+        trainer.rich_eval_evaluator = Some(evaluator_ref);
+
+        // Reward uses the average across episodes: (3.0 + 0.5) / 2 = 1.75
+        assert!((result.0 - 1.75).abs() < 1e-6);
+
+        // Average metric across episodes: (30.0 + 7.0) / 2 = 18.5
+        let metric_value = match record.get("rich_eval_metric_1").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        assert!((metric_value - 18.5).abs() < 1e-6);
+
+        // Per-episode metric totals are also recorded
+        let metric_ep0 = match record.get("rich_eval_metric_1_episode_0").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        let metric_ep1 = match record.get("rich_eval_metric_1_episode_1").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        assert!((metric_ep0 - 30.0).abs() < 1e-6);
+        assert!((metric_ep1 - 7.0).abs() < 1e-6);
+
+        // Evaluator reward average is also recorded and matches env average
+        let eval_reward = match record.get("rich_eval_reward").unwrap() {
+            Scalar(v) => *v,
+            _ => panic!("Unexpected record value"),
+        };
+        assert!((eval_reward - 1.75).abs() < 1e-6);
     }
 }

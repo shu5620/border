@@ -15,6 +15,53 @@ impl RichEvalSnapshot {
     pub fn metrics_map(&self) -> HashMap<u32, f32> {
         self.metrics.iter().copied().collect()
     }
+
+    /// Creates a new empty snapshot.
+    pub fn empty() -> Self {
+        Self {
+            reward: 0.0,
+            metrics: Vec::new(),
+        }
+    }
+
+    /// Computes the difference between this snapshot and a previous one.
+    /// Returns a new snapshot with reward and metrics representing the delta.
+    pub fn delta_from(&self, prev: &RichEvalSnapshot) -> Self {
+        let reward_delta = self.reward - prev.reward;
+        let prev_map = prev.metrics_map();
+
+        let metrics_delta: Vec<(u32, f32)> = self
+            .metrics
+            .iter()
+            .map(|(id, value)| {
+                let prev_value = prev_map.get(id).copied().unwrap_or(0.0);
+                (*id, value - prev_value)
+            })
+            .collect();
+
+        Self {
+            reward: reward_delta,
+            metrics: metrics_delta,
+        }
+    }
+
+    /// Accumulates another snapshot's values into this one.
+    pub fn accumulate(&mut self, other: &RichEvalSnapshot) {
+        self.reward += other.reward;
+
+        let mut self_map: HashMap<u32, f32> = self.metrics_map();
+
+        for (id, value) in &other.metrics {
+            self_map
+                .entry(*id)
+                .and_modify(|v| *v += value)
+                .or_insert(*value);
+        }
+
+        self.metrics = self_map.into_iter().collect();
+        // Sort by metric id for consistent ordering
+        self.metrics.sort_by_key(|(id, _)| *id);
+    }
 }
 
 /// Evaluates a rich set of metrics for early stopping decisions.
